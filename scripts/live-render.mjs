@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { findPackagedApp } from './app-paths.mjs'
 
 const require = createRequire(import.meta.url)
 const electronBinary = require('electron')
@@ -18,7 +19,7 @@ const env = { ...process.env }
 delete env.ELECTRON_RUN_AS_NODE
 
 const useExe = process.env.LIVE_EXE === '1'
-const exePath = path.join(root, 'dist', 'Token Monitor-win32-x64', 'Token Monitor.exe')
+const exePath = useExe ? findPackagedApp(root).executable : electronBinary
 const child = spawn(
   useExe ? exePath : electronBinary,
   useExe ? [`--remote-debugging-port=${port}`, `--user-data-dir=${profile}`] : [root, `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`],

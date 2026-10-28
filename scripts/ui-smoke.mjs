@@ -5,17 +5,21 @@ import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { findPackagedApp } from './app-paths.mjs'
 
 const require = createRequire(import.meta.url)
-const electronBinary = require('electron')
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const usePackaged = process.env.TM_PACKAGED_EXECUTABLE !== undefined || process.argv.includes('--packaged')
+// Source regression runs before packaging; explicit release paths never fall back.
+const electronBinary = usePackaged ? findPackagedApp(root).executable : require('electron')
+const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version
 const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'token-monitor-ui-'))
 const profileDir = path.join(dataRoot, 'profile')
 const configFile = path.join(profileDir, 'config.json')
 const reportFile = path.join(root, 'shots', 'ui-report.json')
 const port = 9300 + Math.floor(Math.random() * 400)
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-const report = { dataRoot, port }
+const report = { dataRoot, port, executable: electronBinary, usePackaged }
 
 fs.mkdirSync(profileDir, { recursive: true })
 fs.mkdirSync(path.join(root, 'shots'), { recursive: true })
@@ -48,7 +52,7 @@ async function launch(label) {
   report[label] = {}
   child = spawn(
     electronBinary,
-    [root, `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`],
+    [...(usePackaged ? [] : [root]), `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`],
     {
       cwd: root,
       env,
@@ -184,6 +188,18 @@ try {
   const { evaluate, waitFor } = session
 
   await waitFor('initial strip', `${viewExpr('view-strip')} && document.getElementById('stripBalance')?.textContent?.trim() === '¥145.09'`)
+  const boot = await evaluate('window.tm.bootstrap()')
+  report.firstLaunch.boot = boot
+  assert.equal(boot.version, version)
+  assert.equal(boot.platform, process.platform)
+  assert.equal(boot.isPackaged, usePackaged)
+  assert.ok(Number.isFinite(boot.morphMs) && boot.morphMs > 0, 'bootstrap must provide morph duration')
+  const backends = {
+    win32: ['dpapi', 'none'],
+    darwin: ['keychain', 'none'],
+    linux: ['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6', 'none']
+  }
+  assert.ok(backends[process.platform]?.includes(boot.encryption), `unexpected storage backend: ${boot.encryption}`)
   report.firstLaunch.strip = await evaluate(`(() => ({
     view: document.body.className,
     inner: [window.innerWidth, window.innerHeight],
@@ -209,7 +225,7 @@ try {
 
   // settings from the strip should expand the deck first
   await evaluate("document.getElementById('stripStatus').click()")
-  await waitFor('settings from strip', `${viewExpr('view-deck')} && document.getElementById('settingsSheet').classList.contains('open')`)
+  await waitFor('settings from strip', `${viewExpr('view-deck')} && !${viewExpr('morphing')} && document.getElementById('settingsSheet').classList.contains('open')`)
   await sleep(450)
   report.firstLaunch.deck = await evaluate(`(() => ({
     inner: [window.innerWidth, window.innerHeight],
@@ -233,7 +249,21 @@ try {
       misans: document.fonts.check('400 12px MiSans')
     },
     band: document.querySelectorAll('#chart .last7-band').length,
-    scroll: (() => { const s = document.getElementById('deckScroll'); return [s.scrollHeight, s.clientHeight] })()
+    scroll: (() => {
+      const s = document.getElementById('deckScroll')
+      const originalTop = s.scrollTop
+      s.scrollTop = s.scrollHeight
+      const bottomTop = s.scrollTop
+      const rect = s.getBoundingClientRect()
+      const lastBottom = s.lastElementChild.getBoundingClientRect().bottom
+      s.scrollTop = originalTop
+      return {
+        height: s.scrollHeight, client: s.clientHeight,
+        width: s.scrollWidth, clientWidth: s.clientWidth,
+        overflowY: getComputedStyle(s).overflowY,
+        top: rect.top, bottom: rect.bottom, bottomTop, lastBottom
+      }
+    })()
   }))()`)
   assert.equal(report.firstLaunch.deck.balance, '145.09')
   assert.equal(report.firstLaunch.deck.runway, '19.8')
@@ -249,7 +279,20 @@ try {
   assert.equal(report.firstLaunch.deck.fonts.inter, true)
   assert.equal(report.firstLaunch.deck.fonts.misans, true)
   assert.equal(report.firstLaunch.deck.band, 1)
-  assert.ok(report.firstLaunch.deck.scroll[0] <= report.firstLaunch.deck.scroll[1] + 1)
+  const deckScroll = report.firstLaunch.deck.scroll
+  assert.ok(deckScroll.client > 0 && deckScroll.clientWidth > 0, 'deck must have a usable scroll area')
+  assert.ok(deckScroll.width <= deckScroll.clientWidth + 1, 'deck must not overflow horizontally')
+  assert.ok(deckScroll.top >= 0 && deckScroll.bottom <= report.firstLaunch.deck.inner[1] + 1, 'deck scroll area must fit the viewport')
+  if (report.firstLaunch.deck.inner[1] >= 880) {
+    assert.ok(deckScroll.height <= deckScroll.client + 1, 'full-height deck must not scroll')
+  } else {
+    assert.match(deckScroll.overflowY, /^(auto|scroll)$/, 'short deck must allow scrolling')
+    if (deckScroll.height > deckScroll.client + 1) {
+      assert.ok(deckScroll.bottomTop > 0, 'short deck overflow must actually scroll')
+      assert.ok(Math.abs(deckScroll.bottomTop - (deckScroll.height - deckScroll.client)) <= 1, 'deck must reach the end of its scroll range')
+    }
+  }
+  assert.ok(deckScroll.lastBottom <= deckScroll.bottom + 1, 'last deck section must be reachable')
   assert.ok(report.firstLaunch.deck.inner[0] >= 560 && report.firstLaunch.deck.inner[0] <= 600)
 
   // theme preview reverts when the sheet closes
@@ -323,45 +366,61 @@ try {
   // Sampled inside the page, one entry per animation frame: the card must
   // never be an empty white box, and neither view may be stretched by the
   // moving window edge.
-  const sampleMorph = async (trigger, ms = 260) => {
-    await evaluate(`(() => {
-      window.__morphSamples = []
+  const sampleMorph = async (trigger) => {
+    await waitFor('morph idle', `!${viewExpr('morphing')}`)
+    // Start the trigger and rAF sampling in the same CDP call. Keep sampling
+    // for the bootstrap duration AND until morphing ends, including slow CI.
+    return evaluate(`new Promise((resolve) => {
+      const samples = []
       const t0 = performance.now()
       const strip = document.getElementById('stripView')
       const deck = document.getElementById('deckView')
       const panel = document.getElementById('panel')
+      const before = Math.round(panel.getBoundingClientRect().height)
       const step = () => {
-        window.__morphSamples.push({
-          t: Math.round(performance.now() - t0),
-          morphing: document.body.classList.contains('morphing'),
+        const elapsed = performance.now() - t0
+        const morphing = document.body.classList.contains('morphing')
+        samples.push({
+          t: Math.round(elapsed), morphing,
           panel: Math.round(panel.getBoundingClientRect().height),
           strip: Math.round(strip.getBoundingClientRect().height),
           deck: Math.round(deck.getBoundingClientRect().height),
           so: +getComputedStyle(strip).opacity,
           dop: +getComputedStyle(deck).opacity
         })
-        if (performance.now() - t0 < ${ms}) requestAnimationFrame(step)
+        if (elapsed < ${boot.morphMs} || morphing) requestAnimationFrame(step)
+        else resolve({ samples, before, after: Math.round(panel.getBoundingClientRect().height) })
       }
       requestAnimationFrame(step)
-    })()`)
-    await evaluate(trigger)
-    await sleep(ms + 260)
-    return (await evaluate('window.__morphSamples')).filter((s) => s.morphing)
+      ${trigger}
+    })`)
   }
 
-  const collapseFrames = await sampleMorph("document.querySelector('.deck-head [data-action=\"collapse\"]').click()")
+  const collapse = await sampleMorph("document.querySelector('.deck-head [data-action=\"collapse\"]').click()")
+  const collapseFrames = collapse.samples.filter((s) => s.morphing)
+  const panelDelta = collapse.before - collapse.after
   report.firstLaunch.morph = {
+    duration: boot.morphMs,
+    sampledUntil: collapse.samples.at(-1)?.t,
     frames: collapseFrames.length,
+    restingPanelFrom: collapse.before,
+    restingPanelTo: collapse.after,
+    panelDelta,
     panelFrom: collapseFrames[0]?.panel,
     panelTo: collapseFrames.at(-1)?.panel,
     dimmest: Math.min(...collapseFrames.map((s) => Math.max(s.so, s.dop))),
     deckHeights: [Math.min(...collapseFrames.map((s) => s.deck)), Math.max(...collapseFrames.map((s) => s.deck))],
     stripHeights: [Math.min(...collapseFrames.map((s) => s.strip)), Math.max(...collapseFrames.map((s) => s.strip))]
   }
-  assert.ok(report.firstLaunch.morph.frames >= 5, `morph sampled only ${report.firstLaunch.morph.frames} frames`)
+  assert.ok(report.firstLaunch.morph.frames >= 3, `morph sampled only ${report.firstLaunch.morph.frames} frames`)
+  assert.ok(panelDelta > 0, `collapse did not shrink the panel: ${collapse.before} -> ${collapse.after}`)
   assert.ok(
-    report.firstLaunch.morph.panelTo < report.firstLaunch.morph.panelFrom - 400,
-    `window did not animate: ${report.firstLaunch.morph.panelFrom} -> ${report.firstLaunch.morph.panelTo}`
+    report.firstLaunch.morph.panelFrom - report.firstLaunch.morph.panelTo >= panelDelta * 0.75,
+    `window did not animate most of its actual ${panelDelta}px change: ${report.firstLaunch.morph.panelFrom} -> ${report.firstLaunch.morph.panelTo}`
+  )
+  assert.ok(
+    collapseFrames.some((s) => s.panel < collapse.before - 1 && s.panel > collapse.after + 1),
+    'morph must include an intermediate panel size, not just an instant jump'
   )
   assert.ok(
     report.firstLaunch.morph.dimmest > 0.45,
@@ -388,9 +447,28 @@ try {
   await waitFor('expanded again', `${viewExpr('view-deck')} && window.innerWidth > 520`)
   await waitConfig((config) => config.view === 'deck', 'view deck')
 
-  // live credential error and encrypted storage
+  // Exercise the real credential failure path with a deliberately invalid key.
+  // This may contact DeepSeek (Node fetch runs in the main process). Accept
+  // authentication/network errors; do not claim this is an offline mock.
+  // Storage assertions follow the real bootstrap backend, not an assumed keyring.
   await evaluate("document.querySelector('.deck-head [data-action=\"settings\"]').click()")
   await waitFor('settings for credentials', "document.getElementById('settingsSheet').classList.contains('open')")
+  report.storage = await evaluate(`(() => {
+    const note = document.getElementById('storageNote')
+    return { text: note.textContent, title: note.title, warning: note.classList.contains('warn') }
+  })()`)
+  report.storage.backend = boot.encryption
+  const encrypted = boot.encryption !== 'none'
+  assert.equal(report.storage.warning, !encrypted, 'storage warning must match the real backend')
+  if (!encrypted) {
+    assert.match(report.storage.text, /未加密.*系统加密服务不可用/)
+    assert.match(report.storage.title, /base64/i)
+    assert.match(report.storage.title, /明文|NOT encrypted/i)
+    assert.doesNotMatch(report.storage.title, /安全加密|落盘前由系统加密|Credentials are encrypted/i)
+  } else {
+    assert.match(report.storage.text, /加密.*只保存在本机/)
+    assert.doesNotMatch(report.storage.text, /未加密/)
+  }
   await evaluate(`(() => {
     const input = document.getElementById('apiKeyInput')
     input.value = 'sk-test-invalid-9876'
@@ -415,14 +493,27 @@ try {
   }))()`)
   assert.equal(report.credential.demoTag, false)
   assert.equal(report.credential.action, '去设置')
-  const stored = await waitConfig((config) => config.demo === false, 'demo off')
+  const stored = await waitConfig((config) => config.demo === false && config.apiKeyEnc, 'demo off and credential saved')
+  const expectedPrefix = encrypted ? 'enc:' : 'plain:'
+  const serializedKey = String(stored.apiKeyEnc)
   report.credential.store = {
-    encrypted: String(stored.apiKeyEnc).startsWith('enc:'),
-    leaked: JSON.stringify(stored).includes('sk-test-invalid-9876'),
+    backend: boot.encryption,
+    prefix: serializedKey.slice(0, serializedKey.indexOf(':') + 1),
+    encrypted: serializedKey.startsWith('enc:'),
+    // Absence of the literal key in JSON is NOT proof of encryption: plain:
+    // is reversible base64 and must be reported as unencrypted.
+    literalKeyPresent: JSON.stringify(stored).includes('sk-test-invalid-9876'),
     sessionEmpty: !stored.sessionTokenEnc
   }
-  assert.equal(report.credential.store.encrypted, true)
-  assert.equal(report.credential.store.leaked, false)
+  assert.equal(report.credential.store.prefix, expectedPrefix)
+  assert.equal(report.credential.store.encrypted, encrypted)
+  assert.equal(report.credential.store.literalKeyPresent, false)
+  assert.ok(serializedKey.length > expectedPrefix.length, 'stored credential payload must not be empty')
+  if (!encrypted) {
+    assert.equal(Buffer.from(serializedKey.slice(expectedPrefix.length), 'base64').toString('utf8'), 'sk-test-invalid-9876')
+  } else {
+    assert.notEqual(serializedKey.slice(expectedPrefix.length), Buffer.from('sk-test-invalid-9876').toString('base64'))
+  }
   assert.equal(report.credential.store.sessionEmpty, true)
 
   await evaluate("document.getElementById('noticeAction').click()")

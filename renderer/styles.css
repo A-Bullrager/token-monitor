@@ -2066,6 +2066,15 @@ body.theme-dark .grain {
   color: var(--muted);
 }
 
+/* Font attribution required by the MiSans agreement; kept on one small line
+   so the settings drawer still fits without scrolling. */
+.set-note.credit {
+  margin-top: 4px;
+  font-size: 7.5px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
 .settings-foot {
   height: 52px;
   flex: none;
@@ -2081,6 +2090,12 @@ body.theme-dark .grain {
 .settings-foot .micro {
   font-size: 6.5px;
   letter-spacing: 0.05em;
+}
+
+/* The credential store is not encrypted everywhere (Linux without libsecret),
+   and the footer should say so in the same colour the UI uses for warnings. */
+.settings-foot .micro.warn {
+  color: var(--amber);
 }
 
 .ink-btn {
@@ -2825,8 +2840,8 @@ body.theme-dark .panel::before {
 }
 
 .set-section {
-  padding: 10px 13px;
-  margin-bottom: 6px;
+  padding: 9px 13px;
+  margin-bottom: 4px;
   border-bottom: 0;
   border-radius: 12px;
   background: var(--paper);
@@ -3088,7 +3103,7 @@ body.theme-dark .panel::before {
 }
 
 .settings-scroll {
-  padding: 10px 13px 4px;
+  padding: 10px 13px 2px;
 }
 
 .gauge-number.is-empty .serif {

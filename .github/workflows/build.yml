@@ -1,0 +1,146 @@
+name: Build desktop apps
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows x64, os: windows-2022, platform: win32, arch: x64 }
+          - { name: Linux x64, os: ubuntu-22.04, platform: linux, arch: x64 }
+          - { name: macOS Apple Silicon, os: macos-15, platform: darwin, arch: arm64 }
+          - { name: macOS Intel, os: macos-15-intel, platform: darwin, arch: x64 }
+    env:
+      CI: 'true'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      EXPECTED_PLATFORM: ${{ matrix.platform }}
+      EXPECTED_ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Check host and version tag
+        shell: bash
+        run: |
+          node -e "const p=require('./package.json'); if(process.platform!==process.env.EXPECTED_PLATFORM || process.arch!==process.env.EXPECTED_ARCH) throw Error('Runner architecture mismatch'); if(process.env.GITHUB_REF_TYPE==='tag' && (process.env.GITHUB_REF_NAME!=='v'+p.version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(p.version))) throw Error('Tag must match package.json version');"
+      - run: npm ci
+      - run: npm run icons
+      - name: Install Linux display dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb openbox libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libsecret-1-0
+      - name: Test source on Windows and macOS
+        if: runner.os != 'Linux'
+        run: npm test
+      - name: Test source on Linux (virtual X11 desktop)
+        if: runner.os == 'Linux'
+        run: |
+          dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1200x24' bash -e -c 'openbox >/tmp/token-monitor-openbox.log 2>&1 & npm test'
+      - name: Build Windows portable ZIP
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          npm run package:win
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force release | Out-Null
+          Compress-Archive -LiteralPath 'dist/Token Monitor-win32-x64' -DestinationPath "release/token-monitor-$version-win-x64.zip"
+      - name: Build Linux AppImage
+        if: runner.os == 'Linux'
+        run: npm run package:linux
+      - name: Build macOS DMG and ZIP (native architecture)
+        if: runner.os == 'macOS'
+        env:
+          # Only certificate-free ad-hoc signing. Never expose signing secrets to PRs.
+          CSC_FOR_PULL_REQUEST: 'true'
+        run: npm run package:mac -- --${{ matrix.arch }}
+      - name: Test extracted ZIP or DMG on Windows and macOS
+        if: runner.os != 'Linux'
+        run: npm run test:distributable
+      - name: Test extracted AppImage on Linux
+        if: runner.os == 'Linux'
+        run: |
+          dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1200x24' bash -e -c 'openbox >/tmp/token-monitor-openbox.log 2>&1 & npm run test:distributable'
+      - name: Upload runnable packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            release/*.zip
+            release/*.dmg
+            release/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            shots/ui-report.json
+            shots/i18n/*.json
+            shots/i18n/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    name: Publish versioned release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: packages-*
+          path: downloads
+          merge-multiple: true
+      - name: Verify package set and create checksums
+        working-directory: downloads
+        shell: bash
+        run: |
+          node -e "const fs=require('fs'); const v=process.env.GITHUB_REF_NAME.slice(1); const want=['win-x64.zip','linux-x64.AppImage','mac-arm64.dmg','mac-arm64.zip','mac-x64.dmg','mac-x64.zip'].map(s=>'token-monitor-'+v+'-'+s); const files=fs.readdirSync('.'); if(files.length!==want.length || want.some(f=>!files.includes(f))) throw Error('Missing or unexpected release assets: '+files);"
+          sha256sum *.zip *.dmg *.AppImage > SHA256SUMS.txt
+      - name: Publish only after every native build and test succeeds
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          # Keep incomplete uploads in a draft. Never replace an existing public release.
+          if gh release view "$GITHUB_REF_NAME" --json isDraft > release-state.json 2>/dev/null; then
+            node -e "if(!require('./release-state.json').isDraft) throw Error('Release already published; use a new version tag')"
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Token Monitor $GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" downloads/* --clobber
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease
+          else
+            gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease=false --latest
+          fi

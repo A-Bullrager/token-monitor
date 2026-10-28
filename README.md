@@ -1,233 +1,222 @@
 # Token Monitor
 
-一块把 **DeepSeek 账户余额**变成「跑道」的桌面仪器。界面参考 Apple 的克制美学：中性系统色、单一强调色、Activity 环式表盘。常驻时只有一条横向条带；需要细看时，它展开成一份完整的账本。
+把 **DeepSeek 余额与用量**放在桌面上的小仪表：日常缩成条带，需要时展开账本，用 `30D / 7D` 两种消费节奏估算「还能用多久」。
+
+**界面仅有中文，含部分英文标签，没有翻译版。** 基于 Electron 45、原生 DOM 与 SVG；无需中转服务器，不做遥测。
 
 ![展开后的账本](shots/deck.png)
 
-## 为什么是跑道
+## 界面与功能
 
-多数 token 监控工具回答「今天花了多少」。真正让人心里有数的问题是「还能撑多久」。Token Monitor 把余额除以消费速度，得到一个以**天**为单位的 runway，并把它放在界面的第一视觉层：
-
-- **双节奏**：`30D` 用近 30 天里有消费的活跃日取平均；`7D` 用近 7 个自然日取平均。两种算法并置，最近突然加速或放缓都能立刻看见。
-- **会落到日期**：跑道不是抽象数字，旁边直接给出「约 11 月 16 日见底」。
-- **形态也是信息**：工作时缩成条带，只看跑道；想深究时从右上角展开成账本，而不是再开一个窗口。
-- **材质不是装饰**：系统级中性色、系统蓝强调色、Activity 环式跑道与克制的图标字形，让它看起来更像 macOS 的原生小组件，而不是一块自定义发光面板。
-
-## 两种形态
-
-### 条带 · 日常驻留
-
-面板 464 × 140。只保留 runway、余额、日均、今日消费、14 天迷你曲线和同步状态。整条面板可以拖动，启动时以非激活方式出现，不抢当前窗口的焦点；系统托盘里可以随时展开、收起、刷新或退出。
+- **条带 / 账本**：余额、今日消费、双节奏跑道与预计见底日期。
+- **用量明细**：近 30 天花费曲线、tokens、模型构成、缓存命中率、请求数与有效单价。
+- **桌面交互**：拖动、置顶、系统托盘、形态切换；透明窗口效果依平台而异。
+- **显示与隐私**：浅色 / 深色 / 跟随系统，一键隐藏金额；默认提供本地演示数据。
+- **同步**：手动刷新，或每 30 秒 / 1 分钟 / 5 分钟刷新。
 
 ![条带形态](shots/strip.png)
 
-### 账本 · 展开细看
-
-面板 504 × 806。包含：
-
-- 径向跑道仪表，`30D / 7D` 节奏切换与见底日期
-- 账户余额、充值 / 赠金构成
-- 今日花费、当前日均、近 30 天窗口与 tokens
-- 近 30 天每日花费曲线：峰值、均值、最后 7 天区段、悬停单日明细
-- 模型构成与有效单价（每 1M tokens 的实际花费）
-- 30D / 7D 双跑道对照与预计月耗
-
-| 设置 | 深色 |
+| 设置抽屉 | 深色主题 |
 | --- | --- |
 | ![设置](shots/settings.png) | ![深色](shots/dark.png) |
 
 ![未连接状态](shots/empty.png)
 
-### 实际运行检查
+运行截图仅作界面参考，不代表本轮或跨平台回归结果：
 
-在 Windows 10、逻辑分辨率 1920 × 1200（150% 缩放）上实际启动便携版做了实测：
-
-- 条带窗口 536 × 212（面板 464 × 140），账本窗口 576 × 880（面板 504 × 806）。四周多出来的 36px 是透明外边，专门给外阴影留的衰减空间。
-- 卡片右侧那条“内阴影”的真凶不是外阴影，而是**收起状态的设置抽屉**：它平移出卡片 103%，但 `-18px 0 44px` 的投影仍然从右边倒射回来，在卡片内侧留下一条约 56px 的灰带。现在抽屉收起时直接 `visibility: hidden`（关闭动画播完才隐藏），投影也减到 `-14px 0 34px / 10%`。实测卡片左右两侧内部 4–44px 的亮度都是 255，完全对称；外侧 alpha 衰减左右同为 `13, 8, 5, 3, 1, 1`，阴影确实落在卡片之外。
-- 面板用不透明白卡 + 均匀 1px 发丝线，不再用渐变描边。设置抽屉 715px 内容对 715px 视口，刚好放满，没有滚动条。
-- Inter 与 MiSans 都从本地子集加载；跑道环 19.8 / 30 对应进度弧 166.63 / 490，条带里的进度条同色同值。
-- 形态切换：动画期间条带和账本**同时绘制**，各自固定在自己的静止高度（不会被移动的窗口边缘拉伸），主进程用 `cubic-bezier(0.4, 0, 0.2, 1)`、300ms 推动窗口边界，内容层用同一条曲线交叉淡入淡出并带一点缩放落位。逐帧采样显示最暗处两层不透明度之和仍有 0.50，不会再出现空白的白卡。`node scripts/morph-cast.mjs` 可以逐帧复查，`npm run test:ui` 里的 morph 断言守住这条底线。
-- 账本内容重排：图表从 145px 提到 176px（保持 1 个 SVG 单位 = 1 CSS px，曲线不会被非等比拉伸），窗口高度相应从 896 收到 880，底部原本约 65px 的空档只剩 18px。
-- 图标：`build/icon.ico` 含 16 / 24 / 32 / 48 / 64 / 128 / 256 七层 32bpp；从打包好的 exe 里取出的 32px 图标与 `renderer/assets/img/icon-32.png` 逐像素一致（0 个色差），四角 alpha 为 0。若 Explorer 仍显示旧图标，那是系统图标缓存，`ie4uinit.exe -show` 或重启资源管理器即可。
-
-| 实际运行 · 条带 | 实际运行 · 账本 |
+| 运行中的条带 | 运行中的账本 |
 | --- | --- |
-| ![实际运行的条带](shots/live-strip.png) | ![实际运行的展开账本](shots/live-deck.png) |
+| ![运行条带](shots/live-strip.png) | ![运行账本](shots/live-deck.png) |
 
-## 功能
+## 下载与运行
 
-- **余额跑道**：30 天活跃日 / 近 7 天自然日两种节奏，一键切换
-- **余额构成**：充值余额与赠金余额的分段条和图例
-- **每日账本**：近 30 天花费曲线，自动跨月取数
-- **模型构成**：按模型汇总 tokens 与费用，并计算有效单价
-- **缓存命中与请求数**：解析平台返回的 cache hit / miss 与 request，给出 30 天缓存命中率；悬停模型行可看该模型的命中率
-- **到位状态**：消费日不足时明确标注样本偏少，不把估算包装成精确结论
-- **系统托盘**：展开账本、收起条带、刷新、设置、显示 / 隐藏、退出；悬停托盘图标可看当前跑道天数
-- **隐私模式**：隐藏所有金额，只保留结构和比例
-- **桌面体验**：无边框、置顶、右上角锚定展开、单实例
-- **主题**：浅色 / 深色 / 跟随系统，设置里可预览，关闭不保存
-- **安全存储**：凭证只在主进程解密，落盘前经 Windows DPAPI 加密
-- **自动刷新**：30 秒 / 1 分钟 / 5 分钟，也可以随时手动刷新
+发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
+**当前工作流刚编写，尚未提交或触发，暂无远程验证结果；以下是配置的发布目标，不代表已发布或已通过测试。**
 
-## 运行
+| 平台 | 程序包 | 使用方式 |
+| --- | --- | --- |
+| Windows x64 | portable ZIP | 解压整个目录，运行其中的 `Token Monitor.exe`；不要把 exe 单独搬出目录 |
+| Linux x64 | AppImage | 赋予可执行权限后，在有图形桌面的环境运行 |
+| macOS Apple Silicon | arm64 DMG + ZIP | DMG 内的应用复制到「应用程序」，或解压 ZIP 后使用 |
+| macOS Intel | x64 DMG + ZIP | 选择 x64 包，不与 arm64 混用 |
 
-Windows 便携版：
+### 平台注意事项
 
-```text
-dist\Token Monitor-win32-x64\Token Monitor.exe
-```
+- **macOS**：当前为 ad-hoc 签名（`identity: '-'`），且 `notarize: false`；不是 Developer ID 签名，也未公证。浏览器下载后可能被 Gatekeeper 拦截。
+- 下载后先校验发布页的 `SHA256SUMS.txt`。仅在信任来源时，按系统提示到「系统设置 → 隐私与安全」允许打开；若系统不允许，不要强行绕过。校验和不等于开发者身份认证。
+- **Linux**：需要图形桌面及 Electron 依赖，如 GTK、NSS、ATK、GBM、ALSA；凭证保护还需要可用的桌面密钥环服务。依赖名称和 FUSE 安装方式请遵循发行版文档。
+- GNOME 可能需要 AppIndicator / KStatusNotifierItem 托盘扩展。透明窗口、置顶和托盘行为依桌面、合成器及 Wayland 环境而异，不保证一致。
+- 本轮已在 Windows 10 x64 通过源码、便携目录和实际 ZIP 解包启动检查；Linux / macOS 尚未原生运行，不能标为已验证支持。
 
-也可以双击根目录的 `start.cmd`，它会优先启动便携版；没有构建产物时回退到源码模式。
+## 从源码运行
 
-从源码运行：
+需要 **Node.js ≥ 22.12.0，推荐 Node.js 24**，以及 npm。在仓库根目录执行：
 
 ```bash
-npm install
+npm ci
 npm start
 ```
 
-其他命令：
+`npm start` 会为子进程移除残留的 `ELECTRON_RUN_AS_NODE`，避免 Electron 退化为无窗口的 Node 模式。
 
-```bash
-npm run showcase      # 带渐变场景的展示窗口
-npm run shots         # 重新生成 deck / strip / settings / dark / empty 截图
-npm run test:parse    # 数据口径与聚合测试
-npm run test:ui       # 隔离配置目录的界面回归测试
-npm run package:win   # 重新打包 Windows 便携版
-npm run test:packaged # 校验 dist 中的便携版能否启动与还原形态
-npm run render:live   # 真实启动并截图/记录条带、账本、设置、深色的实测数据
-node scripts/morph-cast.mjs   # 逐帧录制形态切换（窗口尺寸 / 两层不透明度 / 卡片几何）
-```
+### 本地打包
 
-慢放录制便于看清单帧：`TM_MORPH_MS=1800 node scripts/morph-cast.mjs`（配合 `TM_MORPH_DEBUG=1` 打印主进程每次窗口变更）。
+请在对应平台构建；首次构建前可运行 `npm run icons` 生成打包图标。
 
-> 如果当前 shell 设置了 `ELECTRON_RUN_AS_NODE=1`，直接执行 `npx electron .` 会进入纯 Node 模式。项目的启动器会在子进程里移除该变量，使用 `npm start` 即可。
+| 命令 | 目标与输出 |
+| --- | --- |
+| `npm run package:dir` | 本机平台与架构的目录版，输出到 `dist/Token Monitor-<platform>-<arch>/` |
+| `npm run package:win` | **仅 Windows x64 宿主**；生成 `dist/Token Monitor-win32-x64/`，不会自行生成 ZIP |
+| `npm run package:linux` | Linux x64 AppImage，输出到 `release/` |
+| `npm run package:mac` | macOS DMG + ZIP，默认使用宿主架构，输出到 `release/` |
 
-## 接入真实账户
+macOS 可显式选择 `npm run package:mac -- --arm64` 或 `npm run package:mac -- --x64`；构建不等于已在目标架构运行验证。
+Windows 发布 ZIP 由 CI 压缩整个目录生成。`test:distributable` 需要 `release/` 中实际存在对应程序包，不能用目录版代替。
 
-1. 打开设置（顶部状态、齿轮，或快捷键 `Ctrl + ,`）。
-2. **API Key（必填）**：在 [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) 创建，用于官方余额接口。
-3. **Session Token（可选，但用量明细必填）**：
-   - 登录 [platform.deepseek.com/usage](https://platform.deepseek.com/usage)；
-   - `F12` → Network，刷新页面，打开任意一个 `api/v0` 请求；
-   - 复制 `Authorization` 中 `Bearer` 后面的部分（可整段粘贴，应用会自动清理前缀）。
-4. 关闭「使用演示数据」，保存并同步。
+## 接入 DeepSeek 账户
 
-DeepSeek 的 API Key 只能读取余额，不能读取平台用量；所以只看跑道数字时填 API Key 即可，要看今日、30 天和模型构成还需要 Session Token。Token 过期后重新复制即可。
+1. 打开设置，先确认底部的凭证存储提示。
+2. 在 [DeepSeek API Keys](https://platform.deepseek.com/api_keys) 创建 **API Key**，用于官方余额接口。
+3. 要获取用量与跑道，登录 [平台用量页](https://platform.deepseek.com/usage)，打开开发者工具的 Network，刷新页面。
+4. 在 `api/v0` 请求的 `Authorization` 中复制 `Bearer` 后的 **Session Token**；也可整段粘贴，应用会清理前缀。
+5. 关闭「使用演示数据」，保存并同步。Session 过期后需手动更新。
 
-## 数据口径
+**API Key 只能读取余额。跑道需要余额和 Session Token 提供的用量数据；仅填 API Key 无法计算跑道。**
+Session Token 是敏感凭证，不要放进截图、日志、Issue 或公开仓库。
 
-| 指标 | 来源与算法 |
+## 指标口径
+
+| 指标 | 算法 / 来源 |
 | --- | --- |
 | 账户总余额 | 官方 `GET https://api.deepseek.com/user/balance`，优先 CNY 账户 |
-| 今日花费 / tokens | 平台按日用量与费用的本地日期当天 |
-| 近 30 天花费 / tokens | 最近 30 个自然日，自动合并上一个月 |
-| 30D 日均 | 近 30 天总消费 ÷ **有消费的天数** |
-| 30D runway | 总余额 ÷ 30D 日均 |
-| 7D 日均 | 近 7 个自然日总消费 ÷ 7（零消费日也计入） |
-| 7D runway | 总余额 ÷ 7D 日均 |
-| 见底日期 | 今天 + 当前跑道天数，按本地时区取整 |
+| 今日花费 / tokens | 平台按日数据，取本地日历的今天 |
+| 近 30 天花费 / tokens | 含今天的 30 个自然日，必要时合并上月数据 |
+| 30D 日均 | 近 30 天总消费 ÷ 有消费的活跃日数 |
+| 30D 跑道 | 总余额 ÷ 30D 日均 |
+| 7D 日均 | 近 7 个自然日总消费 ÷ 7，零消费日也计入 |
+| 7D 跑道 | 总余额 ÷ 7D 日均 |
+| 见底日期 | 本地今天加上四舍五入后的跑道天数，属于估算 |
 | 预计月耗 | 当前所选节奏的日均 × 30 |
-| 有效单价 | 近 30 天总费用 ÷ 近 30 天 tokens × 1,000,000 |
-| 缓存命中率 | 近 30 天输入 tokens 中命中缓存的占比：hit ÷（hit + miss + 未命中 prompt） |
-| 请求数 | 平台返回的 `REQUEST` 计数，按同一个 30 天窗口求和 |
-| 模型缓存命中 | 每个模型在同一窗口内的命中率，显示在模型行的悬停提示里 |
-| 每日曲线 | 近 30 天每日费用；最后 7 天单独着色；悬停显示费用与 tokens |
+| 有效单价 | 近 30 天总费用 ÷ tokens × 1,000,000 |
+| 缓存命中率 | `hit ÷ (hit + miss + 普通 prompt/input) × 100%`，按输入 tokens 统计 |
+| 请求数 / 模型构成 | 在相同 30 天窗口聚合；模型行提供各模型缓存命中率提示 |
 
-用量来自平台网页控制台使用的内部接口：
+日均为零或缺少必要数据时，不给出有效跑道估计；消费样本偏少会提示「仅供参考」。
+平台用量来自未公开的内部接口 `/api/v0/usage/amount` 与 `/api/v0/usage/cost`（域名 `platform.deepseek.com`，按月请求）。
+字段、鉴权及数据延迟可能变化；上月请求失败时当前实现继续使用可取得的数据，30 天统计可能不完整。
 
-- `GET https://platform.deepseek.com/api/v0/usage/amount?month=M&year=Y`
-- `GET https://platform.deepseek.com/api/v0/usage/cost?month=M&year=Y`
+## 安全与本地配置
 
-这些接口**未在官方文档中公开**，字段或鉴权方式可能变化。余额接口则是官方公开接口。
+凭证经 preload 桥交给主进程，保存后只向界面返回掩码。`safeStorage` 是否可用取决于当前平台和桌面服务：
 
-## 安全与隐私
-
-- 凭证经最小化的 preload 桥进入主进程；保存后不再回传渲染层，设置页只显示 `sk-••••1234` 形式的掩码。
-- 写入磁盘前使用 Electron `safeStorage`（Windows 上为 DPAPI）加密，配置文件位于 `%APPDATA%\Token Monitor\config.json`。
-- 应用只会在刷新或测试连接时请求 `api.deepseek.com` 与 `platform.deepseek.com`；没有中转服务器、统计上报或第三方请求。
-- 设置里留空会保留旧凭证；「清除凭证」会同时清空两项并切回演示模式。
-- 展示背景、图标和演示数据全部在本地。
-
-## 快捷键
-
-| 快捷键 | 功能 |
+| 平台 | 可用时采用的保护 |
 | --- | --- |
-| `Ctrl/Cmd + R` | 刷新账户 |
-| `Ctrl/Cmd + ,` | 打开设置 |
-| `E` | 展开 / 收起账本 |
-| `Esc` | 关闭设置；再按一次收起账本 |
+| Windows | DPAPI |
+| macOS | Keychain |
+| Linux | 真实的 `gnome_libsecret` 或 KWallet（`kwallet` / `kwallet5` / `kwallet6`）后端 |
 
-## 已知限制
+Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均按 `none` 处理。
+**系统加密不可用时，仍沿用 `plain:` + base64 的落盘回退；这不是加密，能读取配置文件的人可以还原凭证。** UI 会显示「未加密 · 系统加密服务不可用」警告；不接受此方式时请勿保存真实凭证。
 
-- 只适配 DeepSeek；多平台聚合尚未实现。
-- 平台用量接口未公开，若失效需要更新 `lib/deepseek.js`；余额与错误状态仍可正常显示。
-- Session Token 需要手动更新，没有自动登录或 Cookie 抓取。
-- 演示数据是固定样本，只用于展示界面，不代表任何真实账户。
-- 缓存命中与请求数依赖平台返回对应字段；若某个窗口缺少这些字段，界面会退回只显示时间范围。
-- 暂无开机自启和自动更新。
-- 已在 Windows 10（19045）验证；窗口使用 CSS 合成材质，不依赖系统 Acrylic / Mica。Windows 11 预期可用但未实测。
-- 本次构建的自动化回归使用演示数据和一枚无效测试 Key，未使用真实账户做正样本验证；真实余额与用量展示取决于本地凭证和平台接口。
-- 费用与 token 的统计完全依赖平台返回值与本地时区；平台数据延迟时界面会随之延迟。
+日常配置文件位置（不含测试使用的隔离 profile）：
 
-## 项目结构
+| 平台 | `config.json` 路径 |
+| --- | --- |
+| Windows | `%APPDATA%\Token Monitor\config.json` |
+| macOS | `~/Library/Application Support/Token Monitor/config.json` |
+| Linux | `${XDG_CONFIG_HOME:-~/.config}/Token Monitor/config.json` |
 
-```text
-token-monitor/
-├── main.js                  # 窗口双形态、IPC、加密配置、展示/截图模式
-├── preload.js               # 最小化 contextBridge API
-├── lib/
-│   ├── deepseek.js          # 余额 / 平台用量接口、30 天聚合、双节奏指标
-│   ├── demo.js              # 可复现的演示数据
-│   └── store.js             # DPAPI 加密配置存储
-├── renderer/
-│   ├── index.html
-│   ├── styles.css           # Apple 风格材质、条带 / 账本、图表与设置抽屉
-│   ├── app.js               # 渲染、图表、交互、设置、自动刷新
-│   └── assets/
-│       ├── font/            # 三套字体子集与 OFL 许可证
-│       └── img/             # 窗口 / 托盘图标
-├── scripts/
-│   ├── launch.mjs           # 规避 ELECTRON_RUN_AS_NODE 的启动器
-│   ├── shots.mjs            # 五种展示截图
-│   ├── test-parse.mjs       # 数据层测试
-│   ├── ui-smoke.mjs         # 隔离配置的界面回归（双形态、主题、凭证）
-│   ├── packaged-check.mjs   # 便携版启动与形态还原校验
-│   ├── live-render.mjs      # 实际运行截图与渲染数据
-│   └── morph-cast.mjs       # 逐帧录制形态切换，验证卡片不会变空、视图不被拉伸
-├── shots/                   # 演示截图
-└── dist/                    # Windows 便携版
+设置中凭证留空表示保留旧值；「清除凭证」会清空两项并切回演示模式。
+账户请求直接发往 `api.deepseek.com` / `platform.deepseek.com`；没有中转服务器或统计上报。图标、字体与演示数据均为本地资源。
+
+## 测试与验证范围
+
+**本轮本地验证（Windows 10 x64）：** 数据测试、13 组模拟存储后端、源码 UI、便携目录和实际 ZIP 解包启动均通过；9 个语言 / 时区场景、共 36 个界面状态通过，采集的 257 个字符均在语料内。另用 fontTools 检查现有语料的实际字体 cmap，未发现覆盖缺口。
+
+Linux / macOS 尚无原生运行结果；工作流 YAML 和 electron-builder 配置已本地校验，CI 尚未触发。
+
+| 命令 | 检查范围 |
+| --- | --- |
+| `npm test` | 依次运行数据、存储、UI、语言环境测试 |
+| `npm run test:parse` | 数据解析、聚合、双节奏与边界情况，无需图形界面 |
+| `npm run test:store` | 13 组模拟系统后端的存储契约；不代替真实密钥环验证 |
+| `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样 |
+| `npm run test:i18n` | 下述 Chromium 语言 / 时区与字体加载检查，不是翻译测试 |
+| `npm run test:packaged` | `dist/` 目录版启动、字体、版本和形态还原 |
+| `npm run test:distributable` | 从 `release/` 的实际 ZIP / DMG / AppImage 解包并启动其中的可执行文件，不回退到 `dist/` |
+| `npm run render:live` | 运行取证与截图；`npm run shots` 更新展示截图 |
+
+回归使用隔离配置目录和演示数据；凭证错误路径会尝试用无效测试 Key 请求 DeepSeek，可接受鉴权或网络失败，不是完全离线测试，也不是有效真实账户的正样本验证。
+形变（morph）的亮度代理指标是 `min(每帧 max(条带 opacity, 账本 opacity))`，不是两层 opacity 之和；该采样也不证明所有环境都无重影。
+
+### 语言环境与字体检查
+
+`test:i18n` 共启动 **9 次**：
+
+- 请求七种 Chromium 语言：`zh-CN`、`en-US`、`ja-JP`、`de-DE`、`fr-FR`、`ko-KR`、`ar-SA`。后五种在本机实际规范化为 `ja / de / fr / ko / ar`，报告同时保留请求值和实际值。
+- 另两次通过 CDP 模拟 Chromium 时区：`Pacific/Kiritimati`（UTC+14）与 `Pacific/Niue`（UTC−11），不改变宿主或主进程时区。
+- 每次使用独立、含中文与空格的 profile，检查配置落盘；遍历浅色条带、浅色账本、设置、深色账本四个状态。
+- 余额、跑道、今日花费、tokens 的固定演示数值文本与 `zh-CN` 基准比较；不要求时钟、日期与日期相关标签相同。
+- 检查 Inter / MiSans 的 FontFace 加载状态，以及采集的 DOM 字符是否属于 `scripts/font-corpus.txt` 语料。
+
+这些检查**不证明字体 cmap 完整覆盖、所有 fallback 字形、原生菜单、其他宿主 OS 语言版本或真实密钥加密**；语言测试本身不填写凭证，也不做加解密往返。
+界面数字分组固定 `en-US`、时钟为 `zh-CN` 24 小时制，保留中文大数单位；这不代表提供英文或其他语言 UI。
+
+## GitHub Actions 与发布
+
+工作流见 [`.github/workflows/build.yml`](.github/workflows/build.yml)，以下描述的是配置行为，尚未经远程运行验证。
+本地 `git commit` 不会触发云端任务；需要 push、PR 或手动触发。GitHub Packages 面向 npm / 容器等包仓库，本项目的桌面程序使用 Artifacts 和 Release 附件分发。
+
+| 触发方式 | 行为 |
+| --- | --- |
+| 向 `main` push / 面向 `main` 的 PR | 测试、打包、验证发布物，上传 Artifacts，不创建 Release |
+| 手动 `workflow_dispatch` | 同样测试与打包，不创建 Release |
+| push `v*` tag | tag 必须严格等于 `v` + `package.json` 的版本，四个 runner 全部成功后才发布 Release |
+
+四个 runner 为 `windows-2022` x64、`ubuntu-22.04` x64、`macos-15` arm64、`macos-15-intel` x64，使用 Node.js 24。
+Linux UI 在 Xvfb + Openbox 虚拟 X11 桌面运行，不代表 GNOME / Wayland 等实际桌面均已验证。
+程序包 Artifacts 保留 **14 天**，测试诊断保留 7 天；下载 Artifacts 后可能还需解开外层归档。
+
+Release 需包含六件程序包及 `SHA256SUMS.txt`，文件前缀为 `token-monitor-<version>-`：
+
+- `win-x64.zip`、`linux-x64.AppImage`
+- `mac-arm64.dmg`、`mac-arm64.zip`
+- `mac-x64.dmg`、`mac-x64.zip`
+
+tag 带 `-`（如 `v2.4.0-beta.1`）会标为预发布；普通版本 tag 发布正式版。已有公开 Release 不应覆盖，请使用新版本。
+
+### 启用与日后发布
+
+1. 在仓库设置中启用 Actions，并确认组织策略允许所用 runner、第三方 Actions 与发布权限。
+2. 工作流必须先存在于**默认分支**，Actions 页才可手动运行它；选择 **Build desktop apps → Run workflow**。
+3. 无需配置 PAT：Release job 已声明 `contents: write`，使用自带的 `GITHUB_TOKEN`；组织策略仍可能限制执行或授权。
+4. 用户明确确认后才提交 / 推送。当前代码与工作流尚未完成远程验证，不把本地修改当作已上线。
+
+以下仅为日后示例，**本轮不执行**：先把版本（`package.json` 及锁文件）更新到目标版本并推送代码与工作流，确认目标 tag 在本地和远端均未使用。
+若目标版本为 `2.4.0`，才使用：
+
+```bash
+git tag v2.4.0 && git push origin v2.4.0
 ```
 
-## 设计与开源参考
+GitHub 官方文档：[托管 runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [触发事件](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows)。
 
-界面、信息架构和实现均为本项目重新设计。这一轮重新调研了 AI 用量监控类开源项目，重点看它们的产品形态、指标取舍和状态表达：
+## 项目结构与限制
 
-- [Javis603/token-monitor](https://github.com/Javis603/token-monitor)（3.4k★）— 47 种工具、多设备同步，以及一整套“在你视线所及之处”的形态：刘海面板、屏幕边缘 Dock、菜单栏 / 托盘、悬浮气泡、系统小组件；还提供缓存命中拆分与实时 tok/s。
-- [xiufengsun/TokenTracker](https://github.com/xiufengsun/TokenTracker)（2.1k★）— 本地日志解析、4 个桌面小组件、桌面宠物与成就；仪表盘里有 input / output / cached / reasoning 的逐日表格和活动热力图。
-- [Maciek-roboblog/Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) — 以 burn rate 为核心，P90 自动推断限额、带重置感知的节奏预测，以及 `indeterminate / near limit / limit hit` 这类机器可读状态。
-- [jazzyalex/agent-sessions](https://github.com/jazzyalex/agent-sessions) — 明确提出 “Session Runway”：按 5 小时 / 周窗口显示每个会话的 burn 和剩余时间，并在数据不足时给出 `measuring / unavailable / exhausted`，而不是编造数值。
-- DeepSeek 专项：[Yi-Lings/deepseek-api-usage-checker](https://github.com/Yi-Lings/deepseek-api-usage-checker)、dsh-meter、DeepSeek Usage Panorama 等，普遍把 **cache hit / miss、请求数、分模型用量**当作核心读数。
-- [Leiuo/deepseek-monitor](https://github.com/Leiuo/deepseek-monitor)、[Joyi-code/DeepSeekMonitorWindows](https://github.com/Joyi-code/DeepSeekMonitorWindows)、[steipete/CodexBar · docs/deepseek.md](https://github.com/steipete/CodexBar/blob/main/docs/deepseek.md) — 余额 / 用量接口与 Windows 监控形态的参考。
+- `main.js` / `preload.js`：窗口、托盘、IPC 与最小化桥接。
+- `lib/deepseek.js` / `lib/store.js`：账户接口、指标聚合与配置存储。
+- `renderer/`：界面、样式、图表、本地字体；`scripts/`：启动、打包与回归。
+- `shots/`：展示与运行截图；`dist/` 为目录版，`release/` 为可分发程序包。
 
-这一轮真正影响产品的四个判断：
+仅支持 DeepSeek，不做多平台聚合、多设备同步、自动登录、开机自启或自动更新。
+演示数据不代表真实账户；费用与用量依赖平台返回值及本地日期，预测不能当作消费承诺。
 
-1. **“剩余多久”比“花了多少”更有用。** 多家项目都在做 burn rate / runway / reset forecast，说明我们以跑道为第一指标是对的；我们把它做成常驻读数，并给出见底日期。
-2. **数据不足时要明说。** 受 agent-sessions 启发，当消费日太少时标注“仅 N 个消费日”，不把小样本外推伪装成精确结论。
-3. **DeepSeek 的缓存命中率值得上桌。** 缓存命中与请求数是 DeepSeek 生态里被反复追踪的专属指标，我们把它做进模型构成区，并在模型行悬停时给出各自的命中率。
-4. **常驻工具需要一个托盘。** 参考项目的菜单栏 / 托盘 / 边缘形态说明：桌面仪器不该只有一扇窗。我们加入系统托盘，但不扩散成一整套多形态矩阵。
+## 参考与许可
 
-明确不做的部分：多工具聚合、会话级记录、多设备同步、桌面宠物与成就、KPI 卡片阵列和热力图。它们属于另一个产品（广度型监控台）；Token Monitor 只想把**一个 DeepSeek 账户的余额跑道**做到足够准、足够安静。
+参考项目：[token-monitor](https://github.com/Javis603/token-monitor)、[agent-sessions](https://github.com/jazzyalex/agent-sessions)、[CodexBar](https://github.com/steipete/CodexBar)。
 
-视觉上多数同类项目选择深色玻璃、配额进度条和柱状 / 热力图；本项目改用 Apple 风格的系统中性色与 Activity 环式跑道，并保留单一跑道指标和条带 / 账本双形态。
+项目代码采用 [MIT](LICENSE)。字体遵循各自许可，不由项目 MIT 许可覆盖：
 
-字体：
-
-- Inter 子集 — SIL Open Font License，见 `renderer/assets/font/licenses/OFL-Inter.txt`
-- MiSans 子集 — 小米 MiSans 字体许可，取自本地授权字体文件
-
-应用图标由本项目绘制：48px 以上使用完整表盘，16 / 24 / 32px 使用加粗的小尺寸字形；窗口、托盘和 exe 共用同一轮廓。尺寸对照见 `shots/icon-sizes.png`，旧版四角发黑的对照见 `shots/icon-before-after.png`，从便携版 exe 里直接取出的 32px 图标与源图并排见 `shots/icon-check.png`。展示背景是 CSS 渐变，不依赖位图素材。
-
-## License
-
-MIT
+- **Inter**：rsms 提供，采用 SIL OFL 1.1；使用、子集化与再分发须保留许可及版权声明，见 [OFL-Inter.txt](renderer/assets/font/licenses/OFL-Inter.txt)。
+- **MiSans**：由小米提供，字形由汉仪制作；本项目使用子集并保留 README、应用「设置 → 关于」及 [MiSans-Notice.txt](renderer/assets/font/licenses/MiSans-Notice.txt) 中的署名。
+- MiSans 的子集化与公开再分发是否符合许可，仍需核对[官方协议与下载页](https://hyperos.mi.com/font/download)及具体用途。保留署名、未改字形或仅随应用分发，都**不能保证已完全解决授权问题**；以官方协议原文为准。

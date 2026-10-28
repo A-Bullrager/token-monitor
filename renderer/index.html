@@ -331,8 +331,8 @@
           <section class="set-section">
             <h3>键位</h3>
             <dl class="key-list">
-              <div><dt>刷新账户</dt><dd><kbd>Ctrl</kbd><span>+</span><kbd>R</kbd></dd></div>
-              <div><dt>打开设置</dt><dd><kbd>Ctrl</kbd><span>+</span><kbd>,</kbd></dd></div>
+              <div><dt>刷新账户</dt><dd><kbd data-mod>Ctrl</kbd><span>+</span><kbd>R</kbd></dd></div>
+              <div><dt>打开设置</dt><dd><kbd data-mod>Ctrl</kbd><span>+</span><kbd>,</kbd></dd></div>
               <div><dt>展开 / 收起</dt><dd><kbd>E</kbd></dd></div>
               <div><dt>关闭设置或收起</dt><dd><kbd>Esc</kbd></dd></div>
             </dl>
@@ -340,7 +340,8 @@
 
           <section class="set-section about">
             <h3>关于</h3>
-            <p class="set-note">Token Monitor <span id="versionText">v2.3.0</span> · 本地优先 · 非官方 DeepSeek 客户端。余额来自官方 API；用量来自平台会话接口，可能随平台调整。</p>
+            <p class="set-note">Token Monitor <span id="versionText">v2.4.0</span> · 本地优先 · 非官方 DeepSeek 客户端。余额来自官方 API；用量来自平台会话接口，可能随平台调整。</p>
+            <p class="set-note credit">Fonts: Inter (SIL OFL 1.1) · MiSans (Xiaomi, royalty-free commercial license)</p>
             <div class="set-actions space">
               <button class="text-btn" type="button" id="footerUsage">平台用量页 ↗</button>
               <button class="text-btn danger" type="button" id="clearBtn">清除凭证</button>
@@ -349,7 +350,7 @@
         </div>
 
         <footer class="settings-foot">
-          <span class="micro faint">DPAPI 加密 · 只保存在本机</span>
+          <span class="micro faint" id="storageNote">只保存在本机</span>
           <button id="saveBtn" class="ink-btn" type="button">保存并同步</button>
         </footer>
       </aside>

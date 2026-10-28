@@ -141,6 +141,30 @@ function prettyModel(name = '') {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
+// Use ASCII modifier labels, which are present in the bundled font subsets.
+const STORAGE_NOTES = {
+  dpapi: 'DPAPI 加密 · 只保存在本机',
+  keychain: 'Keychain 加密 · 只保存在本机',
+  gnome_libsecret: 'libsecret 加密 · 只保存在本机',
+  kwallet: 'KWallet 加密 · 只保存在本机',
+  kwallet5: 'KWallet 5 加密 · 只保存在本机',
+  kwallet6: 'KWallet 6 加密 · 只保存在本机',
+  none: '未加密 · 系统加密服务不可用'
+}
+
+function applyPlatformLabels({ platform, encryption } = {}) {
+  const mod = platform === 'darwin' ? 'Cmd' : 'Ctrl'
+  for (const chip of document.querySelectorAll('[data-mod]')) chip.textContent = mod
+  const note = document.getElementById('storageNote')
+  if (note) {
+    note.textContent = STORAGE_NOTES[encryption] || STORAGE_NOTES.none
+    note.classList.toggle('warn', encryption === 'none')
+    note.title = encryption === 'none'
+      ? 'No secure system keyring. Credentials are saved as reversible base64, NOT encrypted.'
+      : 'Credentials are encrypted by the system before saving on this device.'
+  }
+}
+
 function resolveTheme(mode) {
   if (mode === 'dark') return 'dark'
   if (mode === 'light') return 'light'
@@ -1585,6 +1609,7 @@ async function init() {
       document.documentElement.style.setProperty('--morph-ms', `${Math.round(boot.morphMs)}ms`)
     }
     if (boot.formHeights?.strip && boot.formHeights?.deck) state.formHeights = boot.formHeights
+    applyPlatformLabels(boot)
     document.body.classList.toggle('showcase', Boolean(boot.showcase))
     applyTheme(FORCE_DARK ? 'dark' : state.baseTheme)
     setBodyView(state.view)

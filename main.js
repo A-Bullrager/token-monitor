@@ -18,7 +18,7 @@ const deepseek = require('./lib/deepseek')
 const { buildDemoState } = require('./lib/demo')
 
 app.setName('Token Monitor')
-app.setAppUserModelId('com.tokenmonitor.desktop')
+if (process.platform === 'win32') app.setAppUserModelId('com.tokenmonitor.desktop')
 
 const IS_SHOWCASE_ARG = process.argv.includes('--showcase')
 const SHOT_ARG = process.argv.find((arg) => arg.startsWith('--shot='))
@@ -204,16 +204,24 @@ function animateWindowBounds(target, duration = MORPH_MS) {
 }
 
 function trayImage() {
+  // macOS draws the menu bar icon from a monochrome template so it follows the
+  // light / dark menu bar; elsewhere the colour mark is used as-is.
+  const isMac = process.platform === 'darwin'
+  const base = isMac ? 'icon-template' : 'icon'
   const image = nativeImage.createEmpty()
+  let found = false
   for (const [file, scaleFactor] of [
-    ['icon-16.png', 1],
-    ['icon-32.png', 2]
+    [`${base}-16.png`, 1],
+    [`${base}-32.png`, 2]
   ]) {
     const filePath = path.join(__dirname, 'renderer', 'assets', 'img', file)
     if (fs.existsSync(filePath)) {
       image.addRepresentation({ scaleFactor, buffer: fs.readFileSync(filePath) })
+      found = true
     }
   }
+  if (!found) return nativeImage.createFromPath(path.join(__dirname, 'renderer', 'assets', 'img', 'icon-16.png'))
+  if (isMac) image.setTemplateImage(true)
   return image
 }
 
@@ -268,16 +276,53 @@ function createTray() {
   try {
     tray = new Tray(trayImage())
     tray.setToolTip('Token Monitor · DeepSeek 跑道')
-    tray.on('click', () => {
-      if (!mainWindow) return
-      if (mainWindow.isVisible()) mainWindow.hide()
-      else revealWindow()
-    })
+    // macOS owns the click when a tray context menu is installed.
+    if (process.platform !== 'darwin') {
+      tray.on('click', () => {
+        if (!mainWindow) return
+        if (mainWindow.isVisible()) mainWindow.hide()
+        else revealWindow()
+      })
+    }
     updateTrayMenu()
   } catch (error) {
     console.error('tray init failed:', error?.message || String(error))
     tray = null
   }
+}
+
+// A real application menu is expected on macOS (and it is what gives the
+// settings fields working Cmd+C / Cmd+V / Cmd+A). Deliberately excluded: a
+// reload accelerator, because Ctrl/Cmd+R already means "refresh the account"
+// here, and a menu role would fight the renderer handler for it.
+function installApplicationMenu() {
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null)
+    return
+  }
+  const template = [
+    { role: 'appMenu' },
+    { role: 'editMenu' },
+    {
+      label: '视图',
+      submenu: [
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' }
+      ]
+    },
+    { role: 'windowMenu' },
+    {
+      label: '帮助',
+      submenu: [
+        {
+          label: 'DeepSeek 平台用量页',
+          click: () => shell.openExternal('https://platform.deepseek.com/usage')
+        }
+      ]
+    }
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
 function createWindow() {
@@ -474,14 +519,21 @@ function registerIpc() {
       config.intervalSec = 60
       config.theme = FORCE_DARK ? 'dark' : 'light'
     }
+    const workArea = mainWindow
+      ? screen.getDisplayMatching(mainWindow.getBounds()).workArea
+      : screen.getPrimaryDisplay().workArea
     return {
       version: app.getVersion(),
       platform: process.platform,
+      encryption: store.encryptionBackend(),
       config,
       showcase,
       view: currentView,
       morphMs: MORPH_MS,
-      formHeights: { strip: STRIP_SIZE.height, deck: DECK_SIZE.height },
+      formHeights: {
+        strip: fitSize('strip', workArea).height,
+        deck: fitSize('deck', workArea).height
+      },
       isShot: IS_SHOT,
       isPackaged: app.isPackaged
     }
@@ -583,11 +635,13 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    installApplicationMenu()
     registerIpc()
     createWindow()
     createTray()
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
+      else revealWindow()
     })
   })
 

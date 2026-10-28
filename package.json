@@ -2,23 +2,94 @@
   "name": "token-monitor",
   "productName": "Token Monitor",
   "version": "2.4.0",
-  "description": "A warm paper runway instrument for DeepSeek balance and token spend.",
+  "description": "DeepSeek 余额与用量的桌面跑道仪器 — an always-on-top runway instrument for DeepSeek balance and token spend.",
   "main": "main.js",
-  "author": "Token Monitor contributors",
+  "author": "A-Storm",
   "license": "MIT",
   "private": true,
+  "homepage": "https://github.com/A-Bullrager/token-monitor#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/A-Bullrager/token-monitor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/A-Bullrager/token-monitor/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "token-usage",
+    "balance",
+    "electron",
+    "desktop-widget",
+    "runway"
+  ],
+  "desktopName": "token-monitor.desktop",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "start": "node scripts/launch.mjs",
     "showcase": "node scripts/launch.mjs --showcase",
     "shots": "node scripts/shots.mjs",
+    "icons": "node scripts/build-icons.mjs",
+    "test": "npm run test:parse && npm run test:store && npm run test:ui && npm run test:i18n",
     "test:parse": "node scripts/test-parse.mjs",
+    "test:store": "node scripts/test-store.mjs",
     "test:ui": "node scripts/ui-smoke.mjs",
+    "test:i18n": "node scripts/i18n-check.mjs",
     "test:packaged": "node scripts/packaged-check.mjs",
+    "test:distributable": "node scripts/verify-distributable.mjs",
     "render:live": "node scripts/live-render.mjs",
-    "package:win": "electron-packager . \"Token Monitor\" --platform=win32 --arch=x64 --out=dist --overwrite --icon=build/icon.ico --asar --ignore=\"^/dist\" --ignore=\"^/shots\" --ignore=\"^/node_modules\" --ignore=\"^/scripts\" --ignore=\"^/build\""
+    "package:dir": "node scripts/package-dir.mjs",
+    "package:win": "node scripts/package-dir.mjs --win",
+    "package:linux": "electron-builder --linux --publish never",
+    "package:mac": "electron-builder --mac --publish never"
+  },
+  "build": {
+    "appId": "com.tokenmonitor.desktop",
+    "productName": "Token Monitor",
+    "artifactName": "${name}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "asar": true,
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "LICENSE",
+      "lib/**/*",
+      "renderer/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns",
+      "identity": "-",
+      "notarize": false,
+      "target": ["dmg", "zip"]
+    },
+    "dmg": {
+      "title": "Token Monitor"
+    },
+    "linux": {
+      "executableName": "token-monitor",
+      "syncDesktopName": true,
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "synopsis": "DeepSeek 余额与用量的桌面跑道仪器",
+      "maintainer": "A-Storm <noreply@github.com>",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ]
+    }
   },
   "devDependencies": {
     "@electron/packager": "^20.3.0",
-    "electron": "45.0.0"
+    "electron": "45.0.0",
+    "electron-builder": "^26.18.0",
+    "png2icons": "^2.0.1"
   }
 }
