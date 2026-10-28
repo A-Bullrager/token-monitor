@@ -31,7 +31,7 @@
 ## 下载与运行
 
 发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
-**云端两轮（`9faa78e`、`4fb1d4d`）：Windows x64 始终全绿；Linux 与两个 macOS 架构仍有失败，Release 未创建，因此上表暂无可下载产物。** 已定位的原因与修复见「测试与验证范围」。
+**云端最新一轮（`de0c757`）：Windows x64、Linux x64、macOS Apple Silicon 三组已全绿并上传 Artifacts；macOS Intel 仍因 DMG 收尾的 `hdiutil` 竞态失败，Release 尚未创建。** 需要六件程序包全部就绪才会发布。
 
 | 平台 | 程序包 | 使用方式 |
 | --- | --- | --- |
@@ -145,7 +145,11 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 **云端第二轮（`4fb1d4d`）：** Windows x64 仍全绿；Linux 语言测试转绿，失败点变成打包文件名——electron-builder 实际产出 `linux-x86_64.AppImage`，与验包脚本和 Release 契约要求的 `linux-x64` 不一致；两个 macOS 架构仍在同一处超时，但这次带回了进程栈证据：主线程 80/80 次采样停在 `SecItemCopyMatching → SecurityServer → mach_msg`，即启动路径上的**同步钥匙串读取**把主进程整条挂死（源码测试用未签名 Electron，其钥匙串条目在 runner 上已授权，所以只有打包应用会撞上）。
 
-**据此已做的修复：** 退出竞态只放行该一种情况且仍要求进程以 0 退出；等宽标签补上打包的 MiSans 回退并用 CDP 校验真实生效字体；Linux 产物名固定为 `linux-x64`；钥匙串探测改为「打开设置时异步发起」，启动路径不再触碰（见「安全与本地配置」）。这些修复在本地 Windows 全绿，**macOS 的修复效果尚待下一轮云端运行确认**。
+**据此做的修复：** 退出竞态只放行该一种情况且仍要求进程以 0 退出；等宽标签补上打包的 MiSans 回退并用 CDP 校验真实生效字体；Linux 产物名固定为 `linux-x64`；钥匙串探测改为「打开设置时异步发起」，启动路径不再触碰（见「安全与本地配置」）。
+
+**云端第三轮（`de0c757`）：** Windows x64、Linux x64（AppImage 解包后真实启动）、macOS Apple Silicon（DMG + ZIP 构建、严格验签、ZIP 解包与 DMG 复制安装后启动校验）三组全绿；macOS Intel 只在生成 DMG 时失败——`dmgbuild` 收尾的 `hdiutil detach` 撞上「Resource busy」，同一步的 ZIP 已经产出，同配置的 arm64 在同一提交上通过，属于 runner 上的竞态而非打包配置错误，因此给该步骤加了最多三次、只清理自己卷标的有界重试。
+
+**macOS 钥匙串在 CI 的真实结论：** 源码运行探测到 `keychain`（未签名 Electron 的条目在 runner 上已授权），而**打包应用两次都停在 `pending`**——系统始终不回答。现在的检查把这作为已报告的结果接受（应用照常启动、渲染、通过全部界面断言），不再因此挂死；但这意味着**打包版 macOS 的真实钥匙串加密仍未被任何环境验证过**，README 不把它当作已验证。
 
 | 命令 | 检查范围 |
 | --- | --- |
@@ -187,6 +191,8 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 四个 runner 为 `windows-2022` x64、`ubuntu-22.04` x64、`macos-15` arm64、`macos-15-intel` x64，使用 Node.js 24。
 Linux UI 在 Xvfb + Openbox 虚拟 X11 桌面运行，不代表 GNOME / Wayland 等实际桌面均已验证。
+macOS 打包步骤对 `dmgbuild` 的 `hdiutil detach` 竞态做最多三次有界重试，且只卸载卷名为 `Token Monitor*` 的挂载点；重试耗尽即失败，不会静默放过真实打包错误。
+发布物启动校验接受 `pending`（系统未回答钥匙串）作为一种已报告状态并继续跑完其余断言，但会在结果里显式记录，不当作加密已验证。
 程序包 Artifacts 保留 **14 天**，测试诊断保留 7 天；下载 Artifacts 后可能还需解开外层归档。
 
 Release 需包含六件程序包及 `SHA256SUMS.txt`，文件前缀为 `token-monitor-<version>-`：

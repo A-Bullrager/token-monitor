@@ -70,7 +70,29 @@ jobs:
         env:
           # Only certificate-free ad-hoc signing. Never expose signing secrets to PRs.
           CSC_FOR_PULL_REQUEST: 'true'
-        run: npm run package:mac -- --${{ matrix.arch }}
+        shell: bash
+        run: |
+          # dmg-builder does not expose dmgbuild's --detach-retries, and the
+          # runner's hdiutil occasionally loses the detach race ("Resource busy")
+          # after the ZIP target already built. Retry a bounded number of times,
+          # releasing only our own volume so nothing else can be unmounted.
+          version=$(node -p "require('./package.json').version")
+          attempt=0
+          until npm run package:mac -- --${{ matrix.arch }}; do
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge 3 ]; then
+              echo "::error::macOS package build failed on all 3 attempts; this is not a retryable detach race"
+              exit 1
+            fi
+            echo "::notice::macOS package build failed; detaching stale volumes and retrying (attempt $attempt of 3)"
+            for volume in /Volumes/Token\ Monitor*; do
+              [ -d "$volume" ] && hdiutil detach "$volume" -force || true
+            done
+            rm -f "release/token-monitor-$version-mac-${{ matrix.arch }}.dmg"
+            sleep 5
+          done
+          ls -l "release/token-monitor-$version-mac-${{ matrix.arch }}.dmg" \
+                "release/token-monitor-$version-mac-${{ matrix.arch }}.zip"
       - name: Test extracted ZIP or DMG on Windows and macOS
         if: runner.os != 'Linux'
         run: npm run test:distributable
