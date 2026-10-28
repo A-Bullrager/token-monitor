@@ -251,7 +251,7 @@
 [/^(.+) \/ 天$/, '$1 / day'],
 [/^(.+) · 样本消费日不足 (\d+) 天$/, (all, label, n, locale) => `${i18n.translate(label, locale)} · under ${n} sample ${count(n, 'day', 'days')}`],
 [/^(.+) · 仅 (\d+) 个消费日$/, (all, label, n, locale) => `${i18n.translate(label, locale)} · only ${n} spending ${count(n, 'day', 'days')}`],
-[/^活跃 (\d+) 天 · (\d+) 天窗口$/, (all, a, w) => `${a} active ${count(a, 'day', 'days')} · ${w}-day window`],
+[/^活跃 (\d+) 天 · (\d+) 天窗口$/, (all, a, w) => `${a} active ${count(a, 'day', 'days')} of ${w}`],
 [/^充值 (.+) · 赠金 (.+)$/, 'Top-up $1 · grant $2'],
 [/^余额 (.+) · 赠金 (.+)$/, 'Balance $1 · grant $2'],
 

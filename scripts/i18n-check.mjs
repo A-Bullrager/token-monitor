@@ -249,10 +249,6 @@ function validateState(scenario, state, data) {
     assert(Array.isArray(data.untranslated) && data.untranslated.length === 0,
       `${label}: the ${expectedUi} dictionary could not translate ${JSON.stringify(data.untranslated)}`)
   }
-  // A label the instrument cannot fit is a localisation defect that no
-  // character check can see: the text is translated, just cut off.
-  assert(Array.isArray(data.clipped) && data.clipped.length === 0,
-    `${label}: ${data.clipped?.length || 0} labels overflow their box: ${JSON.stringify(data.clipped)}`)
   if (scenario.tz) {
     assert(data.locale.timeZone === scenario.tz && data.locale.offsetMinutes === scenario.offsetMinutes,
       `${label}: Chromium timezone override failed: ${JSON.stringify(data.locale)}`)
@@ -571,6 +567,17 @@ try {
   summary.missingFromCorpus = missing
   summary.sourceOnlyOutsideCorpus = [...sourceChars].filter((ch) => !corpus.has(ch) && !collected.has(ch) && ch.trim() !== '')
   assert(!missing.length, `${missing.length} collected characters are not in scripts/font-corpus.txt: ${missing.join('')}`)
+
+  // A label the instrument cannot fit is a localisation defect no character
+  // check can see: the text is translated, just cut off. Font metrics differ
+  // per OS — a line that fits Windows and Linux overflowed by 12px on macOS —
+  // so this is reported for every scenario at once instead of throwing on the
+  // first one, which would hide the rest behind a single platform's failure.
+  const clipped = results.flatMap((run) => Object.entries(run.states || {}).flatMap(([state, seen]) =>
+    (seen.clipped || []).map((item) => ({ where: `${run.name}/${state}`, ...item }))))
+  summary.clipped = clipped
+  assert(clipped.length === 0,
+    `${clipped.length} labels overflow their box: ${JSON.stringify(clipped.slice(0, 12))}`)
 
   // --keep-shots retains screenshots only, never successful temporary profiles.
   fs.rmSync(profileParent, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
