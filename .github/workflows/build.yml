@@ -44,7 +44,8 @@ jobs:
       - name: Check host and version tag
         shell: bash
         run: |
-          node -e "const p=require('./package.json'); if(process.platform!==process.env.EXPECTED_PLATFORM || process.arch!==process.env.EXPECTED_ARCH) throw Error('Runner architecture mismatch'); if(process.env.GITHUB_REF_TYPE==='tag' && (process.env.GITHUB_REF_NAME!=='v'+p.version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(p.version))) throw Error('Tag must match package.json version');"
+          node -e "if(process.platform!==process.env.EXPECTED_PLATFORM||process.arch!==process.env.EXPECTED_ARCH)throw Error('Runner architecture mismatch')"
+          npm run check:release
       - run: npm ci
       - run: npm run icons
       - name: Install Linux display dependencies

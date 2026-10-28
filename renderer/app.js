@@ -27,7 +27,7 @@ const state = {
   switching: false,
   loading: true,
   error: '',
-  version: '2.4.0',
+  version: '2.4.1',
   clearArmed: false,
   clearTimer: null,
   refreshTimer: null,

@@ -1,7 +1,7 @@
 {
   "name": "token-monitor",
   "productName": "Token Monitor",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "DeepSeek 余额与用量的桌面跑道仪器 — an always-on-top runway instrument for DeepSeek balance and token spend.",
   "main": "main.js",
   "author": "A-Storm",
@@ -39,6 +39,7 @@
     "test:i18n": "node scripts/i18n-check.mjs",
     "test:packaged": "node scripts/packaged-check.mjs",
     "test:distributable": "node scripts/verify-distributable.mjs",
+    "check:release": "node scripts/check-release.mjs",
     "render:live": "node scripts/live-render.mjs",
     "package:dir": "node scripts/package-dir.mjs",
     "package:win": "node scripts/package-dir.mjs --win",
@@ -68,7 +69,10 @@
       "icon": "build/icon.icns",
       "identity": "-",
       "notarize": false,
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "dmg": {
       "title": "Token Monitor"
@@ -84,7 +88,9 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     }

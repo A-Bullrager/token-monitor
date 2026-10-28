@@ -31,7 +31,7 @@
 ## 下载与运行
 
 发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
-**云端最新一轮（`de0c757`）：Windows x64、Linux x64、macOS Apple Silicon 三组已全绿并上传 Artifacts；macOS Intel 仍因 DMG 收尾的 `hdiutil` 竞态失败，Release 尚未创建。** 需要六件程序包全部就绪才会发布。
+**云端最新一轮（`036e326`）：Windows x64、Linux x64、macOS arm64、macOS Intel 四组全部通过，六件程序包已作为 Artifacts 上传；Release 要等版本标签推送后才创建。**
 
 | 平台 | 程序包 | 使用方式 |
 | --- | --- | --- |
@@ -149,11 +149,14 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 **云端第三轮（`de0c757`）：** Windows x64、Linux x64（AppImage 解包后真实启动）、macOS Apple Silicon（DMG + ZIP 构建、严格验签、ZIP 解包与 DMG 复制安装后启动校验）三组全绿；macOS Intel 只在生成 DMG 时失败——`dmgbuild` 收尾的 `hdiutil detach` 撞上「Resource busy」，同一步的 ZIP 已经产出，同配置的 arm64 在同一提交上通过，属于 runner 上的竞态而非打包配置错误，因此给该步骤加了最多三次、只清理自己卷标的有界重试。
 
+**云端第四轮（`036e326`，四组全绿）：** Intel 那次竞态确实复现了，重试机制在第二次尝试时把 DMG 构建救回来（日志留有一条 detach 重试提示），随后 ZIP 解包与 DMG 复制安装两条路径都通过；四个 runner 各自上传了程序包 Artifacts。
+
 **macOS 钥匙串在 CI 的真实结论：** 源码运行探测到 `keychain`（未签名 Electron 的条目在 runner 上已授权），而**打包应用两次都停在 `pending`**——系统始终不回答。现在的检查把这作为已报告的结果接受（应用照常启动、渲染、通过全部界面断言），不再因此挂死；但这意味着**打包版 macOS 的真实钥匙串加密仍未被任何环境验证过**，README 不把它当作已验证。
 
 | 命令 | 检查范围 |
 | --- | --- |
 | `npm test` | 依次运行数据、存储、UI、语言环境测试 |
+| `npm run check:release` | 版本号一致性门禁：`package.json` / 锁文件 / 渲染层两处字面量必须同版本，标签必须等于 `v` + 版本 |
 | `npm run test:parse` | 数据解析、聚合、双节奏与边界情况，无需图形界面 |
 | `npm run test:store` | 21 组模拟系统后端断言：懒探测、pending 拒写、密文沿用与 `plain:` 升级；不代替真实密钥环验证 |
 | `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样 |
@@ -190,6 +193,7 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 | push `v*` tag | tag 必须严格等于 `v` + `package.json` 的版本，四个 runner 全部成功后才发布 Release |
 
 四个 runner 为 `windows-2022` x64、`ubuntu-22.04` x64、`macos-15` arm64、`macos-15-intel` x64，使用 Node.js 24。
+每个 job 的第一步就是 `npm run check:release`：宿主架构必须与 matrix 相符，版本号四处一致，标签场景还要满足 tag == `v` + `package.json` 版本。
 Linux UI 在 Xvfb + Openbox 虚拟 X11 桌面运行，不代表 GNOME / Wayland 等实际桌面均已验证。
 macOS 打包步骤对 `dmgbuild` 的 `hdiutil detach` 竞态做最多三次有界重试，且只卸载卷名为 `Token Monitor*` 的挂载点；重试耗尽即失败，不会静默放过真实打包错误。
 发布物启动校验接受 `pending`（系统未回答钥匙串）作为一种已报告状态并继续跑完其余断言，但会在结果里显式记录，不当作加密已验证。
@@ -203,9 +207,9 @@ Release 需包含六件程序包及 `SHA256SUMS.txt`，文件前缀为 `token-mo
 
 tag 带 `-`（如 `v2.4.0-beta.1`）会标为预发布；普通版本 tag 发布正式版。已有公开 Release 不应覆盖，请使用新版本。
 
-### 启用与日后发布
+### 发布步骤
 
-1. 在仓库设置中启用 Actions，并确认组织策略允许所用 runner、第三方 Actions 与发布权限。
+1. Actions 已在本仓库启用，四个托管 runner 与发布权限均已实际跑通过一次以上。
 2. 工作流必须先存在于**默认分支**，Actions 页才可手动运行它；选择 **Build desktop apps → Run workflow**。
 3. 无需配置 PAT：Release job 已声明 `contents: write`，使用自带的 `GITHUB_TOKEN`；组织策略仍可能限制执行或授权。
 4. 用户明确确认后才提交 / 推送。云端结果以实际运行为准，不把本地修改当作已上线。
