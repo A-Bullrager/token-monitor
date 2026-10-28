@@ -525,6 +525,8 @@ function registerIpc() {
     return {
       version: app.getVersion(),
       platform: process.platform,
+      // null until the async probe answers; never probe here, or a pending
+      // Keychain/DPAPI authorization would block the first paint.
       encryption: store.encryptionBackend(),
       config,
       showcase,
@@ -539,6 +541,11 @@ function registerIpc() {
     }
   })
 
+  // The storage label must not be paid for with a blocked main thread, so the
+  // renderer asks for this only while the settings drawer is open. 'pending'
+  // means the system has not answered; the UI then keeps its neutral wording.
+  ipcMain.handle('app:encryption', async () => await store.resolveBackend(8000))
+
   ipcMain.handle('data:refresh', async () => {
     try {
       const state = await buildRefreshState()
@@ -549,9 +556,9 @@ function registerIpc() {
     }
   })
 
-  ipcMain.handle('config:save', (event, patch) => {
+  ipcMain.handle('config:save', async (event, patch) => {
     if (!trusted(event)) throw new Error('不受信任的请求')
-    const view = store.save(patch || {})
+    const view = await store.save(patch || {})
     if (typeof patch?.alwaysOnTop === 'boolean' && !showcase) {
       applyAlwaysOnTop(patch.alwaysOnTop)
     }
@@ -567,10 +574,10 @@ function registerIpc() {
     return deepseek.testConnection({ apiKey, sessionToken })
   })
 
-  ipcMain.handle('config:clear', (event) => {
+  ipcMain.handle('config:clear', async (event) => {
     if (!trusted(event)) throw new Error('不受信任的请求')
     store.clearSecrets()
-    store.save({ demo: true })
+    await store.save({ demo: true })
     return store.publicView()
   })
 
@@ -584,18 +591,18 @@ function registerIpc() {
     }
     const previous = mainWindow.getBounds()
     const bounds = resizeBoundsForView(view, previous)
-    store.save({ view })
+    await store.save({ view })
     currentView = view
     await animateWindowBounds(bounds)
     mainWindow?.webContents.send('view:changed', view)
     return { view, bounds }
   })
 
-  ipcMain.handle('window:pin', (event, pinned) => {
+  ipcMain.handle('window:pin', async (event, pinned) => {
     if (!trusted(event)) throw new Error('不受信任的请求')
     const next = Boolean(pinned)
     if (!showcase) applyAlwaysOnTop(next)
-    store.save({ alwaysOnTop: next })
+    await store.save({ alwaysOnTop: next })
     return next
   })
 

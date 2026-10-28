@@ -199,7 +199,9 @@ try {
     darwin: ['keychain', 'none'],
     linux: ['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6', 'none']
   }
-  assert.ok(backends[process.platform]?.includes(boot.encryption), `unexpected storage backend: ${boot.encryption}`)
+  // Startup must never touch the system keyring: a pending Keychain/DPAPI
+  // authorization used to freeze the whole main process here.
+  assert.equal(boot.encryption, null, 'bootstrap must not probe the keyring synchronously')
   report.firstLaunch.strip = await evaluate(`(() => ({
     view: document.body.className,
     inner: [window.innerWidth, window.innerHeight],
@@ -450,15 +452,22 @@ try {
   // Exercise the real credential failure path with a deliberately invalid key.
   // This may contact DeepSeek (Node fetch runs in the main process). Accept
   // authentication/network errors; do not claim this is an offline mock.
-  // Storage assertions follow the real bootstrap backend, not an assumed keyring.
+  // Storage assertions follow the backend the system actually reports when the
+  // drawer asks for it, not an assumed keyring.
   await evaluate("document.querySelector('.deck-head [data-action=\"settings\"]').click()")
   await waitFor('settings for credentials', "document.getElementById('settingsSheet').classList.contains('open')")
+  // The drawer is what asks the system; a machine whose keyring never answers
+  // cannot be verified here, so say so instead of guessing a backend.
+  const probed = await evaluate('window.tm.encryption()')
+  assert.notEqual(probed, 'pending', 'the system encryption probe never answered')
+  assert.ok(backends[process.platform].includes(probed), `unexpected storage backend: ${probed}`)
+  await waitFor('storage note settled', `document.getElementById('storageNote').textContent !== '只保存在本机'`, 5000)
   report.storage = await evaluate(`(() => {
     const note = document.getElementById('storageNote')
     return { text: note.textContent, title: note.title, warning: note.classList.contains('warn') }
   })()`)
-  report.storage.backend = boot.encryption
-  const encrypted = boot.encryption !== 'none'
+  report.storage.backend = probed
+  const encrypted = probed !== 'none'
   assert.equal(report.storage.warning, !encrypted, 'storage warning must match the real backend')
   if (!encrypted) {
     assert.match(report.storage.text, /未加密.*系统加密服务不可用/)
@@ -497,7 +506,7 @@ try {
   const expectedPrefix = encrypted ? 'enc:' : 'plain:'
   const serializedKey = String(stored.apiKeyEnc)
   report.credential.store = {
-    backend: boot.encryption,
+    backend: probed,
     prefix: serializedKey.slice(0, serializedKey.indexOf(':') + 1),
     encrypted: serializedKey.startsWith('enc:'),
     // Absence of the literal key in JSON is NOT proof of encryption: plain:

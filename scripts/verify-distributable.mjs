@@ -21,7 +21,34 @@ function run(command, args, options = {}) {
 function archive(extension) {
   const file = path.join(release, `${stem}.${extension}`)
   if (!fs.existsSync(file) || !fs.statSync(file).size) throw new Error(`Missing archive: ${file}`)
+  // A ZIP left over from an earlier build would "verify" code that no longer
+  // exists, so the archive must not be older than anything it is meant to ship.
+  const newestSource = newestMtime(['main.js', 'preload.js', 'package.json', 'lib', 'renderer'])
+  const packed = fs.statSync(file).mtimeMs
+  if (packed < newestSource.time) {
+    throw new Error(
+      `Stale archive: ${path.basename(file)} predates ${newestSource.file} ` +
+      `(${new Date(packed).toISOString()} < ${new Date(newestSource.time).toISOString()}). Rebuild the package.`
+    )
+  }
   return file
+}
+function newestMtime(entries) {
+  let best = { file: '', time: 0 }
+  const visit = (absolute, relative) => {
+    const stat = fs.statSync(absolute)
+    if (stat.isDirectory()) {
+      for (const name of fs.readdirSync(absolute)) visit(path.join(absolute, name), path.join(relative, name))
+    } else if (stat.mtimeMs > best.time) {
+      best = { file: relative, time: stat.mtimeMs }
+    }
+  }
+  for (const entry of entries) {
+    const absolute = path.join(root, entry)
+    if (fs.existsSync(absolute)) visit(absolute, entry)
+  }
+  if (!best.file) throw new Error('No source files found to compare against the archive')
+  return best
 }
 function check(executable) {
   if (!fs.statSync(executable).isFile()) throw new Error(`Missing executable: ${executable}`)

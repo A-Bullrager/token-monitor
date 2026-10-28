@@ -151,17 +151,41 @@ const STORAGE_NOTES = {
   kwallet6: 'KWallet 6 加密 · 只保存在本机',
   none: '未加密 · 系统加密服务不可用'
 }
+// The probe is async and can stay unanswered (locked keychain, no session).
+// "Unknown" must never be rendered as either a promise of encryption or an
+// unencrypted warning, so it keeps the neutral wording from the markup.
+const STORAGE_PENDING_TEXT = '只保存在本机'
+const STORAGE_PENDING_TITLE = 'Waiting for the system encryption check.'
+
+function applyStorageNote(encryption) {
+  const note = document.getElementById('storageNote')
+  if (!note) return
+  const known = STORAGE_NOTES[encryption]
+  note.textContent = known || STORAGE_PENDING_TEXT
+  note.classList.toggle('warn', encryption === 'none')
+  note.title = !known
+    ? STORAGE_PENDING_TITLE
+    : encryption === 'none'
+      ? 'No secure system keyring. Credentials are saved as reversible base64, NOT encrypted.'
+      : 'Credentials are encrypted by the system before saving on this device.'
+}
 
 function applyPlatformLabels({ platform, encryption } = {}) {
   const mod = platform === 'darwin' ? 'Cmd' : 'Ctrl'
   for (const chip of document.querySelectorAll('[data-mod]')) chip.textContent = mod
-  const note = document.getElementById('storageNote')
-  if (note) {
-    note.textContent = STORAGE_NOTES[encryption] || STORAGE_NOTES.none
-    note.classList.toggle('warn', encryption === 'none')
-    note.title = encryption === 'none'
-      ? 'No secure system keyring. Credentials are saved as reversible base64, NOT encrypted.'
-      : 'Credentials are encrypted by the system before saving on this device.'
+  applyStorageNote(encryption)
+}
+
+async function refreshStorageNote() {
+  if (state.storageResolved) return
+  try {
+    const backend = await bridge.encryption()
+    if (backend && backend !== 'pending') {
+      state.storageResolved = true
+      applyStorageNote(backend)
+    }
+  } catch {
+    /* Keep the neutral wording; the next settings opening retries. */
   }
 }
 
@@ -1170,6 +1194,9 @@ async function openSettings({ focus = true } = {}) {
     await switchView('deck')
   }
   populateSettings()
+  // Opening the drawer is the only place the storage backend is shown, so it
+  // is also the only place the (async) system probe is asked for.
+  refreshStorageNote()
   state.settingsOpen = true
   el.sheetScrim.hidden = false
   el.settingsSheet.inert = false

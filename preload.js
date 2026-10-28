@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('tm', {
   bootstrap: () => ipcRenderer.invoke('app:bootstrap'),
+  encryption: () => ipcRenderer.invoke('app:encryption'),
   refresh: () => ipcRenderer.invoke('data:refresh'),
   saveConfig: (patch) => ipcRenderer.invoke('config:save', patch),
   testConnection: (payload) => ipcRenderer.invoke('config:test', payload),

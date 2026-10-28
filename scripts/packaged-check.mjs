@@ -219,7 +219,7 @@ try {
     darwin: ['keychain', 'none'],
     linux: ['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6', 'none']
   }
-  assert.ok(platformBackends[process.platform]?.includes(boot.encryption), `unexpected backend: ${boot.encryption}`)
+  assert.equal(boot.encryption, null, 'packaged startup must not probe the keyring synchronously')
 
   phase = 'strip-assertions'
   const strip = await evaluate(`({
@@ -281,6 +281,14 @@ try {
   await evaluate("document.querySelector('.deck-head [data-action=\"settings\"]').click()")
   await waitFor("document.getElementById('settingsSheet').classList.contains('open')")
   await sleep(400) // Let the 340 ms drawer transition finish before geometry checks.
+  // Opening the drawer is what asks the system. 'pending' is a legitimate
+  // outcome (locked keychain, headless session); a wrong backend is not.
+  const probed = await evaluate('window.tm.encryption()')
+  const keyringAnswered = probed !== 'pending'
+  if (keyringAnswered) {
+    assert.ok(platformBackends[process.platform]?.includes(probed), `unexpected backend: ${probed}`)
+    await waitFor("document.getElementById('storageNote').textContent !== '只保存在本机'")
+  }
   const settings = await evaluate(`(() => {
     const sheet = document.getElementById('settingsSheet')
     const scroller = sheet.querySelector('.settings-scroll')
@@ -321,16 +329,25 @@ try {
     { action: '展开 / 收起', keys: ['E'] },
     { action: '关闭设置或收起', keys: ['Esc'] }
   ])
-  assert.match(settings.storage.text, backendLabels[boot.encryption])
-  assert.equal(settings.storage.warning, boot.encryption === 'none')
-  if (boot.encryption === 'none') {
-    assert.match(settings.storage.title, /base64/i)
-    assert.match(settings.storage.title, /明文|NOT encrypted/i)
-    assert.doesNotMatch(settings.storage.title, /安全加密|落盘前由系统加密|Credentials are encrypted/i)
+  settings.storage.backend = probed
+  if (!keyringAnswered) {
+    // Unknown must read as unknown: neither an encryption promise nor a
+    // plaintext warning, and the app has to stay fully interactive.
+    assert.equal(settings.storage.text, '只保存在本机')
+    assert.equal(settings.storage.warning, false)
+    assert.match(settings.storage.title, /Waiting for the system encryption check/)
   } else {
-    assert.match(settings.storage.text, /加密.*只保存在本机/)
-    assert.doesNotMatch(settings.storage.text, /未加密/)
-    assert.match(settings.storage.title, /落盘前由系统加密|encrypted by the system before saving/i)
+    assert.match(settings.storage.text, backendLabels[probed])
+    assert.equal(settings.storage.warning, probed === 'none')
+    if (probed === 'none') {
+      assert.match(settings.storage.title, /base64/i)
+      assert.match(settings.storage.title, /明文|NOT encrypted/i)
+      assert.doesNotMatch(settings.storage.title, /安全加密|落盘前由系统加密|Credentials are encrypted/i)
+    } else {
+      assert.match(settings.storage.text, /加密.*只保存在本机/)
+      assert.doesNotMatch(settings.storage.text, /未加密/)
+      assert.match(settings.storage.title, /落盘前由系统加密|encrypted by the system before saving/i)
+    }
   }
 
   const inside = (inner, outer, label) => {

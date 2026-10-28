@@ -42,6 +42,8 @@
     "render:live": "node scripts/live-render.mjs",
     "package:dir": "node scripts/package-dir.mjs",
     "package:win": "node scripts/package-dir.mjs --win",
+    "zip:win": "node scripts/zip-win.mjs",
+    "package:win:zip": "node scripts/package-dir.mjs --win && node scripts/zip-win.mjs",
     "package:linux": "electron-builder --linux --publish never",
     "package:mac": "electron-builder --mac --publish never"
   },
@@ -78,6 +80,7 @@
       "icon": "build/icon.png",
       "synopsis": "DeepSeek 余额与用量的桌面跑道仪器",
       "maintainer": "A-Storm <noreply@github.com>",
+      "artifactName": "${name}-${version}-linux-x64.${ext}",
       "target": [
         {
           "target": "AppImage",

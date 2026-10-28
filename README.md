@@ -31,7 +31,7 @@
 ## 下载与运行
 
 发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
-**首次云端运行（提交 `9faa78e`）：Windows x64 全绿；Linux x64 与两个 macOS 架构在测试阶段失败，Release 未创建，因此上表暂无可下载产物。** 修复已在本地验证，尚待下一次云端运行确认。
+**云端两轮（`9faa78e`、`4fb1d4d`）：Windows x64 始终全绿；Linux 与两个 macOS 架构仍有失败，Release 未创建，因此上表暂无可下载产物。** 已定位的原因与修复见「测试与验证范围」。
 
 | 平台 | 程序包 | 使用方式 |
 | --- | --- | --- |
@@ -66,12 +66,13 @@ npm start
 | 命令 | 目标与输出 |
 | --- | --- |
 | `npm run package:dir` | 本机平台与架构的目录版，输出到 `dist/Token Monitor-<platform>-<arch>/` |
-| `npm run package:win` | **仅 Windows x64 宿主**；生成 `dist/Token Monitor-win32-x64/`，不会自行生成 ZIP |
+| `npm run package:win` | 仅生成 Windows x64 目录版（`dist/`），不压缩 |
+| `npm run package:win:zip` | **仅 Windows x64 宿主**；打包目录后压成 `release/token-monitor-<version>-win-x64.zip`，与 CI 使用同一脚本 |
 | `npm run package:linux` | Linux x64 AppImage，输出到 `release/` |
 | `npm run package:mac` | macOS DMG + ZIP，默认使用宿主架构，输出到 `release/` |
 
 macOS 可显式选择 `npm run package:mac -- --arm64` 或 `npm run package:mac -- --x64`；构建不等于已在目标架构运行验证。
-Windows 发布 ZIP 由 CI 压缩整个目录生成。`test:distributable` 需要 `release/` 中实际存在对应程序包，不能用目录版代替。
+`test:distributable` 需要 `release/` 中实际存在对应程序包，不能用目录版代替；它会先比较归档与源码的修改时间，**比源码旧的程序包直接判失败**——曾经有一次本地「验证通过」其实跑的是上一版代码留下的 ZIP。
 
 ## 接入 DeepSeek 账户
 
@@ -118,6 +119,13 @@ Session Token 是敏感凭证，不要放进截图、日志、Issue 或公开仓
 Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均按 `none` 处理。
 **系统加密不可用时，仍沿用 `plain:` + base64 的落盘回退；这不是加密，能读取配置文件的人可以还原凭证。** UI 会显示「未加密 · 系统加密服务不可用」警告；不接受此方式时请勿保存真实凭证。
 
+**探测是懒加载且异步的。** 可用性检查（`isAsyncEncryptionAvailable`，缺失时才退回同步 API）只在打开设置抽屉时发起，启动路径一律不碰钥匙串——macOS 上钥匙串锁住或等待授权时，同步调用会把主进程整条挂死（首次云端运行正是这样卡住的）。因此：
+
+- 还没得到答案时，存储标签保持中性的「只保存在本机」，既不承诺加密，也不谎报未加密。
+- 后端状态未知时提交**新凭证**会被拒绝并提示「系统加密状态未确认，凭证未保存」，不会静默降级成明文；只改主题、节奏、置顶或形态则照常保存。
+- 未改动的凭证沿用磁盘上原有的密文，不会因为一次无关的保存被重新加密或降级；`plain:` 旧值只有在确认后端可靠后才会升级为 `enc:`。
+- 真实钥匙串仍只在 Windows DPAPI 上做过端到端验证；macOS / Linux 的钥匙串路径未在真机验证过。
+
 日常配置文件位置（不含测试使用的隔离 profile）：
 
 | 平台 | `config.json` 路径 |
@@ -131,17 +139,19 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 ## 测试与验证范围
 
-**本轮本地验证（Windows 10 x64）：** 数据测试、13 组模拟存储后端、源码 UI、便携目录和实际 ZIP 解包启动均通过；9 个语言 / 时区场景、共 36 个界面状态通过，采集的 257 个字符均在语料内。另用 fontTools 检查现有语料的实际字体 cmap，未发现覆盖缺口。
+**本地验证（Windows 10 x64）：** 数据测试、21 组模拟存储后端断言、源码 UI、便携目录和实际 ZIP 解包启动均通过；9 个语言 / 时区场景、共 36 个界面状态通过，采集的字符均在语料内。另用 fontTools 检查现有语料的实际字体 cmap，未发现覆盖缺口。
 
-**首次云端运行（同一提交，四个原生 runner）：** Windows x64 的源码测试、打包与 ZIP 解包启动全部通过；Linux x64 在 `ar-SA` 场景请求退出时把「调试连接先于回复关闭」误判为失败（界面与数值检查此前已全部通过）；两个 macOS 架构打包与严格验签成功，但发布物启动校验的首个 CDP 往返超时，原因未定。
+**云端第一轮（`9faa78e`，四个原生 runner）：** Windows x64 全绿；Linux x64 在 `ar-SA` 场景把「退出时调试连接先于回复关闭」误判为失败；两个 macOS 架构打包与严格验签成功，但发布物启动校验在首个 CDP 往返超时。
 
-**针对这三点的修复已在本地 Windows 验证，云端尚未复跑确认：** 退出竞态改为只放行该一种情况且仍要求进程以 0 退出（异常退出、超时、其他错误一律失败）；等宽标签补上随应用打包的 MiSans 回退，并用 CDP `CSS.getPlatformFontsForNode` 检查真实生效字体；发布物校验记录阶段与耗时，失败时在 CI 的 macOS 上抓取进程栈与签名权限。macOS 超时的根因仍未确定，放宽的只是冷启动等待。
+**云端第二轮（`4fb1d4d`）：** Windows x64 仍全绿；Linux 语言测试转绿，失败点变成打包文件名——electron-builder 实际产出 `linux-x86_64.AppImage`，与验包脚本和 Release 契约要求的 `linux-x64` 不一致；两个 macOS 架构仍在同一处超时，但这次带回了进程栈证据：主线程 80/80 次采样停在 `SecItemCopyMatching → SecurityServer → mach_msg`，即启动路径上的**同步钥匙串读取**把主进程整条挂死（源码测试用未签名 Electron，其钥匙串条目在 runner 上已授权，所以只有打包应用会撞上）。
+
+**据此已做的修复：** 退出竞态只放行该一种情况且仍要求进程以 0 退出；等宽标签补上打包的 MiSans 回退并用 CDP 校验真实生效字体；Linux 产物名固定为 `linux-x64`；钥匙串探测改为「打开设置时异步发起」，启动路径不再触碰（见「安全与本地配置」）。这些修复在本地 Windows 全绿，**macOS 的修复效果尚待下一轮云端运行确认**。
 
 | 命令 | 检查范围 |
 | --- | --- |
 | `npm test` | 依次运行数据、存储、UI、语言环境测试 |
 | `npm run test:parse` | 数据解析、聚合、双节奏与边界情况，无需图形界面 |
-| `npm run test:store` | 13 组模拟系统后端的存储契约；不代替真实密钥环验证 |
+| `npm run test:store` | 21 组模拟系统后端断言：懒探测、pending 拒写、密文沿用与 `plain:` 升级；不代替真实密钥环验证 |
 | `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样 |
 | `npm run test:i18n` | 下述 Chromium 语言 / 时区与字体加载检查，不是翻译测试 |
 | `npm run test:packaged` | `dist/` 目录版启动、字体、版本和形态还原 |

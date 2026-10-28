@@ -61,13 +61,7 @@ jobs:
           dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1200x24' bash -e -c 'openbox >/tmp/token-monitor-openbox.log 2>&1 & npm test'
       - name: Build Windows portable ZIP
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          npm run package:win
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $version = (Get-Content package.json | ConvertFrom-Json).version
-          New-Item -ItemType Directory -Force release | Out-Null
-          Compress-Archive -LiteralPath 'dist/Token Monitor-win32-x64' -DestinationPath "release/token-monitor-$version-win-x64.zip"
+        run: npm run package:win:zip
       - name: Build Linux AppImage
         if: runner.os == 'Linux'
         run: npm run package:linux
