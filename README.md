@@ -216,7 +216,7 @@ tag 带 `-`（如 `v2.4.0-beta.1`）会标为预发布；普通版本 tag 发布
 3. 无需配置 PAT：Release job 已声明 `contents: write`，使用自带的 `GITHUB_TOKEN`；组织策略仍可能限制执行或授权。
 4. 用户明确确认后才提交 / 推送。云端结果以实际运行为准，不把本地修改当作已上线。
 
-**tag 必须单独推送。** 本仓库正反两面都实测过：`git push --atomic origin main refs/tags/v2.4.0` 只产生了 `main` 的一次运行，`v2.4.0` 没有对应 tag 运行，Release 也没创建（该标签至今是一个没有发布物的空标记）；后来单独 `git push origin v2.4.1` 则立刻触发了 tag 流水线并发布。官方文档只写明「一次推送超过三个 tag 不会创建事件」，并未定义分支与 tag 同推时的行为，所以这里把同推视为不可靠路径。
+**tag 必须单独推送。** 本仓库正反两面都实测过：`git push --atomic origin main refs/tags/v2.4.0` 只产生了 `main` 的一次运行，`v2.4.0` 没有对应 tag 运行，Release 也就没创建（那个空标记已删除）；后来单独 `git push origin v2.4.1` 则立刻触发了 tag 流水线并发布。官方文档只写明「一次推送超过三个 tag 不会创建事件」，并未定义分支与 tag 同推时的行为，所以这里把同推视为不可靠路径。
 
 ```bash
 git push origin main          # 第一步：让四个 runner 先在新提交上跑绿
