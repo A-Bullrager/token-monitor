@@ -13,6 +13,10 @@ const usePackaged = process.env.TM_PACKAGED_EXECUTABLE !== undefined || process.
 // Source regression runs before packaging; explicit release paths never fall back.
 const electronBinary = usePackaged ? findPackagedApp(root).executable : require('electron')
 const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version
+// The language assertions use the same locale table the app renders, so a new
+// dictionary cannot pass a test that the window itself would fail.
+const i18n = require(path.join(root, 'renderer', 'i18n.js'))
+const { HTML_LANG } = i18n
 const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'token-monitor-ui-'))
 const profileDir = path.join(dataRoot, 'profile')
 const configFile = path.join(profileDir, 'config.json')
@@ -610,6 +614,54 @@ try {
   assert.equal(report.localeRelaunch.pace, '30-day active pace')
   assert.equal(report.localeRelaunch.foot, 'DEMO / sample data')
   assert.equal(report.localeRelaunch.cjk, '', 'English mode must not show Chinese outside the language picker')
+
+  // The restart proves persistence; clicking through the remaining dictionaries
+  // proves each one is really loaded in this window and that changing language
+  // reloads it — the only setting that does. A mid-reload page cannot answer
+  // CDP at all, so this poll swallows the destroyed-context errors too.
+  const settle = async (name, expression, timeout = 20000) => {
+    const deadline = Date.now() + timeout
+    for (;;) {
+      try {
+        if (await session.evaluate(`(() => { try { return ${expression} } catch { return false } })()`)) return
+      } catch {
+        /* the document is being replaced */
+      }
+      if (Date.now() > deadline) throw new Error(`timed out waiting for ${name}`)
+      await sleep(200)
+    }
+  }
+  report.localePicker = {}
+  for (const [locale, pace] of [
+    ['es', 'Ritmo activo de 30 días'],
+    ['pt-BR', 'Ritmo de 30 dias ativos'],
+    ['de', 'Rhythmus 30 Aktivtage']
+  ]) {
+    await session.evaluate("document.querySelector('.deck-head [data-action=\"settings\"]').click()")
+    await session.waitFor(`settings for ${locale}`, "document.getElementById('settingsSheet').classList.contains('open')")
+    await session.evaluate(`document.querySelector('#localeSeg button[data-locale="${locale}"]').click()`)
+    await session.evaluate("document.getElementById('saveBtn').click()")
+    await waitConfig((config) => config.locale === locale, `locale persisted as ${locale}`)
+    await settle(`${locale} deck reloaded`,
+      `document.documentElement.lang === '${HTML_LANG[locale]}' && ${viewExpr('view-deck')} && document.getElementById('deckBalance').textContent.trim() === '145.09'`)
+    await sleep(350)
+    const seen = await session.evaluate(`({
+      lang: document.documentElement.lang,
+      pace: document.getElementById('gaugeCaption').textContent.trim(),
+      cjk: [...document.body.innerText].filter((ch) => /[\\u4e00-\\u9fff]/.test(ch)).join('')
+    })`)
+    assert.equal(seen.pace, pace, `${locale}: pace caption is not the ${locale} wording`)
+    assert.equal(seen.cjk, '', `${locale} mode must not show Chinese: ${seen.cjk}`)
+    report.localePicker[locale] = seen
+    // The reload closes the drawer, and the chips are filled when it opens:
+    // reopening is where a picker that forgot the saved language shows up.
+    await session.evaluate("document.querySelector('.deck-head [data-action=\"settings\"]').click()")
+    await session.waitFor(`settings reopened for ${locale}`, "document.getElementById('settingsSheet').classList.contains('open')")
+    const active = await session.evaluate("document.querySelector('#localeSeg button.active')?.dataset.locale || null")
+    assert.equal(active, locale, `${locale}: the picker must mark the saved language active`)
+    await session.evaluate("document.getElementById('sheetClose').click()")
+    await session.waitFor(`settings closed after ${locale}`, "!document.getElementById('settingsSheet').classList.contains('open')")
+  }
   await quit()
 
   try {

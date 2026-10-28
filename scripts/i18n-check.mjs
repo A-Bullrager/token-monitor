@@ -1,7 +1,10 @@
-// Chromium locale / language environment check. The UI ships in Chinese and
-// English; 'auto' resolves from the browser language, so each scenario below
-// also asserts WHICH language the interface came up in, that no Chinese text
-// survives in English mode, and that the numbers mean the same thing in both.
+// Chromium locale / language environment check. The UI ships in Chinese,
+// English, Spanish, Brazilian Portuguese and German, and 'auto' resolves from
+// the browser language — so each scenario below asserts WHICH language the
+// interface came up in, that no Chinese text survives in any translated mode,
+// and that the numbers mean the same thing in every one of them. Languages
+// with no dictionary (ja, ko, fr, ar) must land on English, the fallback every
+// bundled script can render.
 // The timezone scenarios use CDP emulation, which does not change the host OS
 // or the Electron main process. Each scenario gets a fresh profile with CJK
 // characters and spaces, and exercises strip/light, deck/light, settings/light
@@ -36,8 +39,16 @@ const profileParent = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-i18n-'))
 const SCENARIOS = [
   { name: 'zh', lang: 'zh-CN' },
   { name: 'en', lang: 'en-US' },
-  { name: 'ja', lang: 'ja-JP' },
+  { name: 'es', lang: 'es-ES' },
+  // Same language, different region: the shipped dictionary is one Spanish,
+  // and Chromium delivers es-MX to the page as the neutral es-419 tag.
+  { name: 'es-419', lang: 'es-MX' },
+  { name: 'pt', lang: 'pt-BR' },
+  // European Portuguese falls back to the Brazilian dictionary it shares.
+  { name: 'pt-PT', lang: 'pt-PT' },
   { name: 'de', lang: 'de-DE' },
+  // No dictionary: these must land on the English fallback, not on Chinese.
+  { name: 'ja', lang: 'ja-JP' },
   { name: 'fr', lang: 'fr-FR' },
   { name: 'ko', lang: 'ko-KR' },
   { name: 'ar', lang: 'ar-SA' },
@@ -45,17 +56,35 @@ const SCENARIOS = [
   { name: 'tz-', lang: 'zh-CN', tz: 'Pacific/Niue', offsetMinutes: 660 },
   // The picker must win over the browser language in both directions.
   { name: 'force-en', lang: 'zh-CN', locale: 'en' },
-  { name: 'force-zh', lang: 'en-US', locale: 'zh' }
+  { name: 'force-zh', lang: 'en-US', locale: 'zh' },
+  { name: 'force-es', lang: 'de-DE', locale: 'es' }
 ]
-// 'auto' is the shipped default: Chinese stays Chinese, everything else gets
-// the English interface, which is what the assertions below check per scenario.
-const expectedLocale = (scenario) => scenario.locale || (/^zh/i.test(scenario.lang) ? 'zh' : 'en')
-// 万 / 亿 and compact K / M / B describe the same quantity in different groupings.
-const COUNT_UNITS = { 亿: 1e8, 万: 1e4, K: 1e3, M: 1e6, B: 1e9 }
-function countValue(text) {
-  const match = String(text).replace(/,/g, '').match(/([\d.]+)\s?(亿|万|K|M|B)?/)
+// The resolver under test is the one the app runs, not a copy of its rules.
+const i18n = require(path.join(root, 'renderer', 'i18n.js'))
+const expectedLocale = (scenario) => i18n.resolveLocale(scenario.locale || 'auto', [scenario.lang])
+// Counts are grouped by 万/亿 in Chinese and by compact notation in the other
+// languages: 12.5K, 12,5 mil, 12.500. Same quantity, different spelling, and
+// the decimal mark itself depends on the language — so the UI language decides
+// how the text is parsed instead of a guess from the characters present.
+const UNIT_VALUES = {
+  '万': 1e4, '亿': 1e8,
+  k: 1e3, m: 1e6, b: 1e9,
+  mil: 1e3, tsd: 1e3, mi: 1e6, mio: 1e6, mrd: 1e9
+}
+function countValue(text, uiLocale = 'zh') {
+  const raw = String(text).replace(/[\u00a0\u202f]/g, ' ').trim()
+  // The probe is a readout with a trailing label ("11M TOKENS"), so the number
+  // and its grouping word are read from the front and the rest is ignored.
+  const match = raw.match(/^([\d.,]+)\s*([\u4e00-\u9fffA-Za-z.]+)?/)
   if (!match) return null
-  return Number(match[1]) * (COUNT_UNITS[match[2]] || 1)
+  const commaIsDecimal = uiLocale !== 'en' && uiLocale !== 'zh'
+  const digits = commaIsDecimal
+    ? match[1].replace(/\./g, '').replace(',', '.')
+    : match[1].replace(/,/g, '')
+  const value = Number(digits)
+  if (!Number.isFinite(value)) return null
+  const unit = (match[2] || '').replace('.', '').toLowerCase()
+  return value * (UNIT_VALUES[unit] || 1)
 }
 const CJK_VISIBLE = /[一-鿿-﫿]/
 const EXPECTED_STATES = {
@@ -98,7 +127,8 @@ const COLLECT = `(() => {
   const sheet = document.getElementById('settingsSheet')
   return {
     chars: [...chars].join(''),
-    // Chinese glyphs still on screen in English mode.
+    // Chinese glyphs still on screen where a dictionary should have replaced
+    // them; non-empty in Chinese mode by design.
     cjk: (() => {
       const found = new Set()
       const scan = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
@@ -111,6 +141,38 @@ const COLLECT = `(() => {
       return [...found].join('')
     })(),
     untranslated: window.TmI18n ? window.TmI18n.untranslated.slice() : null,
+    // Longer languages overflow the instrument's fixed geometry, and a clipped
+    // label is a localisation bug that no character check can see. Measure it:
+    // text whose box is too small for it, or that runs past the nearest
+    // clipping ancestor.
+    clipped: (() => {
+      const out = []
+      const limitOf = (el) => {
+        for (let node = el; node; node = node.parentElement) {
+          const style = getComputedStyle(node)
+          if (style.overflowX === 'visible' && style.textOverflow !== 'ellipsis') continue
+          const box = node.getBoundingClientRect()
+          return box.right - (parseFloat(style.paddingRight) || 0)
+        }
+        return window.innerWidth
+      }
+      for (const el of document.querySelectorAll('body *')) {
+        if (!visible(el) || el.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue
+        const own = [...el.childNodes].filter((n) => n.nodeType === 3)
+          .map((n) => n.nodeValue.trim()).join(' ').trim()
+        if (!own) continue
+        const overflowed = el.scrollWidth > el.clientWidth + 1
+        const pastEdge = el.getBoundingClientRect().right > limitOf(el) + 1
+        if (!overflowed && !pastEdge) continue
+        out.push({
+          where: el.id || (typeof el.className === 'string' ? el.className.split(' ')[0] : el.tagName),
+          text: own.slice(0, 46),
+          pixels: Math.max(overflowed ? el.scrollWidth - el.clientWidth : 0,
+            Math.round(el.getBoundingClientRect().right - limitOf(el)))
+        })
+      }
+      return out.slice(0, 10)
+    })(),
     lang: document.documentElement.lang,
     locale: {
       language: navigator.language,
@@ -167,20 +229,30 @@ function validateState(scenario, state, data) {
   const expected = EXPECTED_STATES[state]
   const requested = scenario.lang.toLowerCase()
   const actual = data.locale.language.toLowerCase()
-  // Chromium ships some locales as language-only resources (ja-JP -> ja).
-  // Accept that canonical form, but never accept a different language/region.
-  assert(actual === requested || actual === requested.split('-')[0],
-    `${label}: expected navigator.language=${scenario.lang} or its language-only form, got ${data.locale.language}`)
+  // Chromium ships some locales as language-only resources (ja-JP -> ja) and
+  // folds regional Spanish onto the neutral es-419 tag. Accept those canonical
+  // forms, but never a different language: the resolver only ever looks at the
+  // prefix, so a wrong language here would be a wrong interface.
+  const LANGUAGE_ALIASES = { 'es-mx': ['es-419', 'es'] }
+  const allowed = LANGUAGE_ALIASES[requested] || [requested, requested.split('-')[0]]
+  assert(allowed.includes(actual),
+    `${label}: expected navigator.language=${scenario.lang} or a form Chromium ships for it, got ${data.locale.language}`)
   const expectedUi = scenario.expectedUiLocale || expectedLocale(scenario)
-  assert(data.lang === (expectedUi === 'en' ? 'en' : 'zh-CN'),
-    `${label}: <html lang> must be ${expectedUi === 'en' ? 'en' : 'zh-CN'}, got ${data.lang}`)
-  if (expectedUi === 'en') {
-    assert(!data.cjk, `${label}: Chinese text survived in English mode: ${data.cjk}`)
-    assert(Array.isArray(data.untranslated) && data.untranslated.length === 0,
-      `${label}: the dictionary could not translate ${JSON.stringify(data.untranslated)}`)
-  } else {
+  assert(data.lang === i18n.HTML_LANG[expectedUi],
+    `${label}: <html lang> must be ${i18n.HTML_LANG[expectedUi]}, got ${data.lang}`)
+  if (expectedUi === 'zh') {
     assert(data.cjk.length > 0, `${label}: Chinese mode displayed no Chinese at all`)
+  } else {
+    // Every translated language carries the same promise: no Chinese left on
+    // screen, and nothing the dictionary had to give up on.
+    assert(!data.cjk, `${label}: Chinese text survived in ${expectedUi} mode: ${data.cjk}`)
+    assert(Array.isArray(data.untranslated) && data.untranslated.length === 0,
+      `${label}: the ${expectedUi} dictionary could not translate ${JSON.stringify(data.untranslated)}`)
   }
+  // A label the instrument cannot fit is a localisation defect that no
+  // character check can see: the text is translated, just cut off.
+  assert(Array.isArray(data.clipped) && data.clipped.length === 0,
+    `${label}: ${data.clipped?.length || 0} labels overflow their box: ${JSON.stringify(data.clipped)}`)
   if (scenario.tz) {
     assert(data.locale.timeZone === scenario.tz && data.locale.offsetMinutes === scenario.offsetMinutes,
       `${label}: Chromium timezone override failed: ${JSON.stringify(data.locale)}`)
@@ -213,10 +285,11 @@ function validateState(scenario, state, data) {
     const baseline = results.find((run) => run.name === 'zh').states[state].probes
     for (const probe of NUMERIC_PROBES) {
       if (probe === 'tokens') {
-        // Token counts are grouped by 万/亿 in Chinese and by K/M/B in English;
-        // compare the quantity they both describe, not the spelling.
-        const left = countValue(data.probes[probe])
-        const right = countValue(baseline[probe])
+        // Token counts are grouped by 万/亿 in Chinese and by compact notation
+        // in every other language; compare the quantity they describe, not the
+        // spelling — which is why the UI language has to parse the text.
+        const left = countValue(data.probes[probe], expectedUi)
+        const right = countValue(baseline[probe], 'zh')
         assert(left !== null && right !== null,
           `${label}: cannot compare token counts ${data.probes[probe]} / ${baseline[probe]}`)
         assert(Math.abs(left - right) / Math.max(1, right) < 0.02,
@@ -416,8 +489,8 @@ async function runScenario(scenario) {
     await waitFor("document.getElementById('settingsSheet').classList.contains('open')", 'settings open')
     await sleep(400) // Allow the settings sheet transition to finish for capture.
     await capture('settings')
-    // The bundled-font check needs a Chinese label; English mode shows ASCII
-    // there, so it only applies where CJK is actually on screen.
+    // The bundled-font check needs a Chinese label; a translated mode shows
+    // Latin text there, so it only applies where CJK is actually on screen.
     if (expectedLocale(scenario) === 'zh') await verifyMonoCjk()
 
     await evaluate("document.querySelector('#themeSeg [data-theme=\"dark\"]').click()")
@@ -461,8 +534,8 @@ async function runScenario(scenario) {
 }
 
 const summary = {
-  scope: 'Chinese and English UI under Chromium language environments; the UI ships in these two languages only, not in the host OS language of each scenario',
-  uiLocaleScope: 'auto resolves Chinese browser languages to the Chinese UI and everything else to English; force-en / force-zh check the manual override',
+  scope: `UI in ${i18n.LOCALES.join(', ')} under Chromium language environments; the UI ships in these languages only, not in the host OS language of each scenario`,
+  uiLocaleScope: 'auto resolves a browser language to the shipped dictionary it matches (zh / es / pt / de / en) and everything else to English; force-en / force-zh / force-es check the manual override',
   timezoneScope: 'CDP Chromium timezone emulation only; host OS and main process timezone unchanged',
   fontScope: 'FontFace loading, corpus membership and, in Chinese mode, a representative monospace CJK label actual platform font; no exhaustive cmap/fallback audit',
   encryptionScope: 'bootstrap platform/encryption are reported only; no credential or encryption round-trip tests',
@@ -472,7 +545,12 @@ const summary = {
   scenarios: results
 }
 try {
-  for (const scenario of SCENARIOS) await runScenario(scenario)
+  // --only=<scenario> runs one language (plus the zh baseline it is compared
+  // against), for iterating on a single locale without the full sweep.
+  const only = (process.argv.find((arg) => arg.startsWith('--only=')) || '').split('=')[1]
+  const scenarios = only ? SCENARIOS.filter((s) => s.name === 'zh' || s.name === only) : SCENARIOS
+  if (only && !scenarios.some((s) => s.name === only)) throw new Error(`unknown scenario "${only}"`)
+  for (const scenario of scenarios) await runScenario(scenario)
 
   const corpus = new Set([...fs.readFileSync(corpusFile, 'utf8').replace(/\r?\n/g, '')])
   const collected = new Set(results.flatMap((run) => Object.values(run.states).flatMap((state) => [...state.chars])))

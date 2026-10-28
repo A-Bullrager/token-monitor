@@ -2630,6 +2630,17 @@ body.theme-dark .panel::before {
   overflow: visible;
 }
 
+/* Six language names will not fit one row at this drawer width, and a clipped
+   control is worse than a second row: the chips wrap inside the same tray. */
+.seg-wrap {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.seg-wrap button {
+  flex: 0 0 auto;
+}
+
 .pace-toggle button,
 .seg button {
   border: 0;

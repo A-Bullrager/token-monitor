@@ -1,4 +1,4 @@
-<p align="right"><strong>EN</strong> | <a href="./README.zh-CN.md">简体中文</a></p>
+<p align="right"><strong>EN</strong> | <a href="./README.zh-CN.md">简体中文</a> | <a href="./README.es.md">Español</a> | <a href="./README.pt-BR.md">Português</a> | <a href="./README.de.md">Deutsch</a></p>
 
 <div align="center">
     <img src="build/icon.png" alt="Token Monitor" width="96">
@@ -13,7 +13,7 @@
     </p>
 </div>
 
-It rests as a strip, expands into a ledger, and estimates *how long your money lasts* using two spending paces (`30D / 7D`). The interface ships in **Chinese and English**: `Auto` follows the system language — Chinese stays Chinese, everything else gets the English interface — and either language can be pinned in Settings. Built on Electron 45 with plain DOM and SVG. No proxy server, no telemetry.
+It rests as a strip, expands into a ledger, and estimates *how long your money lasts* using two spending paces (`30D / 7D`). The interface ships in **Chinese, English, Spanish, Brazilian Portuguese and German**: `Auto` follows the system language, and any of the five can be pinned in Settings. Built on Electron 45 with plain DOM and SVG. No proxy server, no telemetry.
 
 ## Showcase
 
@@ -32,6 +32,11 @@ Every image below renders local demo data; they show the interface, and are not 
 <td width="33%" align="center"><img src="shots/settings.png" width="290" alt="Settings drawer"><br><sub><b>Settings</b> — credentials, refresh, theme, language and shortcuts</sub></td>
 <td width="33%" align="center"><img src="shots/dark.png" width="290" alt="Dark theme"><br><sub><b>Dark</b> — for night or dark desktops</sub></td>
 <td width="33%" align="center"><img src="shots/empty.png" width="290" alt="Disconnected state"><br><sub><b>Not connected</b> — demo data until you add credentials</sub></td>
+</tr>
+<tr>
+<td width="33%" align="center"><img src="shots/deck-es.png" width="290" alt="Ledger en español"><br><sub><b>Español</b> — <i>Autonomía</i>, <i>Recarga / bono</i>, <i>Se agota 5 mar</i></sub></td>
+<td width="33%" align="center"><img src="shots/deck-pt-BR.png" width="290" alt="Livro em português do Brasil"><br><sub><b>Português (Brasil)</b> — <i>Autonomia</i>, <i>Recarga / bônus</i>, <i>Acaba 5 de mar.</i></sub></td>
+<td width="33%" align="center"><img src="shots/deck-de.png" width="290" alt="Buch auf Deutsch"><br><sub><b>Deutsch</b> — <i>Reichweite</i>, <i>Aufladung / Gutschrift</i>, <i>Am 5. März leer</i></sub></td>
 </tr>
 </table>
 
@@ -55,7 +60,8 @@ The two images below come from a live window rather than the staged showcase, as
 ## Download and run
 
 Releases: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Development builds are in the Artifacts of each Actions run.
-**[v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0) is the current release** — the bilingual interface build. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and was extracted and launched on a real Windows 10 machine; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop.
+**[v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0) is the current release** — the bilingual (Chinese / English) interface build. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and was extracted and launched on a real Windows 10 machine; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop.
+**The Spanish, Portuguese and German interface described below lives on `main` and is not in any published build yet** — download v2.5.0 and you get Chinese and English.
 
 | Platform | Package | How to run it |
 | --- | --- | --- |
@@ -162,23 +168,24 @@ Account requests go straight to `api.deepseek.com` / `platform.deepseek.com`; th
 
 ## Language support
 
-The UI is authored in Chinese; English is derived from a single dictionary shared by the main process and the renderer (`renderer/i18n.js`), so a label cannot be updated in one language only.
+The interface is authored in Chinese, and every other language is a dictionary keyed by that exact Chinese string (`renderer/i18n.js` plus `renderer/locales/<locale>.js`), loaded by the main process *and* the renderer. A label cannot be updated in one language only: `npm run check:i18n` fails if a dictionary is missing a key, answers in Chinese, drops an interpolated shape, or forgets a plural.
 
 | English interface | Chinese interface |
 | --- | --- |
 | ![Ledger (English)](shots/deck-en.png) | ![中文界面](shots/deck.png) |
 
-- **What is translated**: both window forms, the settings drawer, shortcut list, notices, error messages, tray menu, tray tooltip and the macOS application menu.
-- **What is not translated**: the product name, `DeepSeek`, and the language picker's own option names, which stay in Latin script on purpose (see the font note below).
-- **Number and date formats follow the language**: Chinese groups token counts with 万 / 亿 and writes depletion as `约 3 月 5 日见底`; English uses compact notation (`12.5K`, `1.3M`) and `Runs out Mar 5`. The underlying quantities are identical, and the checks compare them numerically.
-- **Deliberately unchanged**: currency symbols follow the account, the clock stays 24-hour, and the thousands separator stays grouped as `en-US`.
-- Switching the language saves the setting and **reloads the window**; that is the only setting that does, because text already written into the page cannot be retranslated in place.
+- **Shipped languages**: Chinese (the authored language), English, Spanish, Brazilian Portuguese and German. `Auto` matches the system language by prefix — `zh*`, `es*`, `pt*`, `de*`, `en*` — and everything else lands on English, the one fallback every bundled font can render. `pt-PT` therefore gets the Brazilian dictionary; `es-MX` and `es-ES` share one Spanish.
+- **What is translated**: both window forms, the settings drawer, shortcut list, notices, error messages, tray menu, tray tooltip and the macOS application menu — plus the ASCII instrument chrome (`DAYS`, `TOTAL`, `SAMPLE`, `AVG`, `PEAK ¥29.10 · 10-03`, `SYNCED 18:02:18`), which Chinese mode shows in English too.
+- **What is not translated**: the product name, the `Know your runway.` tagline, `DeepSeek`, `API KEY` / `SESSION TOKEN` as field names, and the instrument codes `DEMO`, `SYNC`, `30D / 7D` and the `M` / `K` magnitude units.
+- **Number and date formats follow the language**: Chinese groups token counts with 万 / 亿 and writes depletion as `约 3 月 5 日见底`; English uses `12.5K` and `Runs out Mar 5`; Spanish `12,5 mil` and `Se agota 5 mar`; Portuguese `12,5 mil` and `Acaba 5 de mar.`; German `12.500` and `Am 5. März leer`. The quantities behind them are identical, and the checks compare them numerically.
+- **Plurals belong to the language**: Chinese marks no grammatical number, so each dictionary inflects its own counted noun (`1 día activo` / `15 días activos`, `1 Tag` / `15 Tage`). The parity check refuses a locale whose one-form and many-form come out the same, and treats a measured `1.0` as plural.
+- **Known limit**: money keeps one dot-decimal style in every language (`¥145.09`), and so does the clock. Only token counts follow the language's own grouping. Switching the language saves the setting and **reloads the window** — the only setting that does, because text already written into the page cannot be retranslated in place.
 
-**A real constraint on Chinese wording**: the shipped MiSans subset was built from a fixed character corpus, and it does not contain 语 / 言 / 英 / 文. Rebuilding the subset would mean fetching the original MiSans and Inter sources and adding a subsetting build step, which also touches the open MiSans licensing question noted below. Until that is done, new Chinese copy must stay inside `scripts/font-corpus.txt` — which is why the language row is labelled `LANGUAGE` with Latin option names instead of `语言 / 中文`. The corpus check in `npm run test:i18n` fails if any visible character leaves that set, and it already caught a real bug once: monospace labels rendered as tofu on Linux runners because the font stack had no bundled CJK fallback.
+**A real constraint on wording**: the shipped fonts are subsets. The MiSans subset was cut from a fixed corpus and does not contain 语 / 言 / 英 / 文, so new Chinese copy must stay inside `scripts/font-corpus.txt` — which is why the language row is labelled `LANGUAGE` and the Chinese option reads `Chinese`. The accents the new languages need (`Á Ã Ç É Í Ó Ø Ú Ü ß á ã ä ç é ê í ñ ó ô õ ö ú ü`) were checked against the actual Inter subset cmap with fontTools, and `scripts/glyph-demand.mjs` fails before any window opens if a dictionary asks for a character outside the corpus. The corpus check in `npm run test:i18n` then re-checks the characters really on screen, and it has already caught a real bug once: monospace labels rendered as tofu on Linux runners because the font stack had no bundled CJK fallback.
 
 ## Tests and what they prove
 
-**Local (Windows 10 x64)**: data tests, 21 mocked storage-backend assertions, source UI, directory build and a real ZIP extraction and launch all pass; 11 language scenarios × 4 interface states pass, and every collected character is inside the corpus. fontTools was used to check the actual subset cmaps against that corpus with no gaps found.
+**Local (Windows 10 x64)**: data tests, 22 mocked storage-backend assertion groups, dictionary parity, glyph demand, source UI, directory build and a real ZIP extraction and launch all pass; 16 language scenarios × 4 interface states pass, every collected character is inside the corpus, and no label is clipped in any shipped language. fontTools was used against the actual subset cmaps — every Latin character the dictionaries can put on screen is in the Inter subset, and every Chinese character in the demand set is in one of the two bundles.
 
 **Eight cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat.
 
@@ -211,11 +218,12 @@ The UI is authored in Chinese; English is derived from a single dictionary share
 | --- | --- |
 | `npm test` | Data, storage, UI and language-environment suites in order |
 | `npm run check:release` | Version gate: `package.json`, lockfile and the two renderer literals must agree, and a tag must equal `v` + version |
-| `npm run check:docs` | Parity gate between the two READMEs: same section structure, same screenshots, no broken markdown, HTML or cross-language links, balanced `<details>` |
+| `npm run check:i18n` | Dictionary parity across every shipped language — same keys, same interpolated shapes, no Chinese answers, one-form different from many-form — plus the glyph-demand check against `scripts/font-corpus.txt` |
+| `npm run check:docs` | Parity gate across the five READMEs: each one links every other language and marks itself current, and all share the same section structure, screenshots, `<details>` balance and working markdown / HTML / cross-language links |
 | `npm run test:parse` | Parsing, aggregation, both paces and edge cases; no GUI needed |
-| `npm run test:store` | 21 assertions over mocked system backends: lazy probe, refusal while pending, ciphertext retention and `plain:` upgrade; not a real keyring |
-| `npm run test:ui` | Forms, themes, privacy, settings, credential branches and clearing, restart restore, morph sampling, and the language switch followed by a restart that must still be English. Every phase except the last pins Chinese, because the assertions are written for one language and the host language is not ours to assume (the first version of this failed on all four runners, whose hosts answer in English) |
-| `npm run test:i18n` | The Chromium language / timezone and font checks described below |
+| `npm run test:store` | 22 assertion groups over mocked system backends: lazy probe, refusal while pending, ciphertext retention, `plain:` upgrade and the accepted language list; not a real keyring |
+| `npm run test:ui` | Forms, themes, privacy, settings, credential branches and clearing, restart restore, morph sampling, the switch to English followed by a restart, and a picker round trip through Spanish, Portuguese and German that must reload the window and re-highlight the saved language. Every phase except the unpinned ones pins Chinese, because the assertions are written for one language and the host language is not ours to assume (the first version of this failed on all four runners, whose hosts answer in English) |
+| `npm run test:i18n` | The Chromium language / timezone, font and label-fitting checks described below |
 | `npm run test:packaged` | Directory build: launch, fonts, version and form restore |
 | `npm run test:distributable` | Extracts the real ZIP / DMG / AppImage from `release/` and launches the executable inside it; never falls back to `dist/` |
 | `npm run render:live` | Live forensics and screenshots; `npm run shots` refreshes the showcase images |
@@ -225,14 +233,15 @@ The morph brightness proxy is `min(per frame max(strip opacity, deck opacity))`,
 
 ### Language environment and font checks
 
-`test:i18n` launches **11 scenarios**:
+`test:i18n` launches **16 scenarios**:
 
-- Seven Chromium languages — `zh-CN`, `en-US`, `ja-JP`, `de-DE`, `fr-FR`, `ko-KR`, `ar-SA`. The last five canonicalise to `ja / de / fr / ko / ar` locally; the report keeps both requested and actual values. Each scenario also asserts **which UI language the app resolved** (Chinese stays Chinese, everything else becomes English) and, in English mode, that no Chinese text and no untranslated strings remain on screen.
+- Eleven Chromium languages — `zh-CN`, `en-US`, `es-ES`, `es-MX`, `pt-BR`, `pt-PT`, `de-DE`, `ja-JP`, `fr-FR`, `ko-KR`, `ar-SA`. Chromium canonicalises some of them (`ja-JP` → `ja`, `es-MX` → the neutral `es-419`), and the report keeps both requested and actual values. Each scenario asserts **which UI language the app resolved**: `zh*` stays Chinese, `es*` / `pt*` / `de*` / `en*` get their own dictionary, and a language with no dictionary (ja, fr, ko, ar) gets English. In every translated mode the check requires no Chinese text and no untranslated strings on screen.
 - Two timezone scenarios emulate Chromium zones over CDP: `Pacific/Kiritimati` (UTC+14) and `Pacific/Niue` (UTC−11). Neither changes the host OS nor the main process timezone.
-- Two override scenarios pin the language against the browser language (`--locale=en` on `zh-CN`, `--locale=zh` on `en-US`), which is what the Settings picker does.
+- Three override scenarios pin the language against the browser language (`--locale=en` on `zh-CN`, `--locale=zh` on `en-US`, `--locale=es` on `de-DE`), which is what the Settings picker does.
 - Every scenario gets its own profile whose path contains CJK characters and spaces, checks what was written to disk, and walks light strip, light ledger, settings and dark ledger.
-- Balance, runway and today's spend are compared as exact strings against the `zh-CN` baseline; token counts are compared numerically because the two languages group them differently. Clocks and date-dependent labels are not compared.
+- Balance, runway and today's spend are compared as exact strings against the `zh-CN` baseline; token counts are compared numerically, parsing each language's own grouping (`1096 万`, `11M`, `11 M`, `11 Mio.`). Clocks and date-dependent labels are not compared.
 - Inter / MiSans FontFace status is checked, collected DOM characters must belong to `scripts/font-corpus.txt`, and in Chinese mode CDP `CSS.getPlatformFontsForNode` reads the platform font actually used by a Chinese label to confirm it comes from the bundled MiSans subset.
+- **Every visible label is measured against its own box** (`scrollWidth` and the nearest clipping ancestor), because a longer language otherwise passes every text check while showing `Fenster über 30 T…` cut off. This assertion is what caught the three overflows in the first Spanish / Portuguese / German build.
 
 These checks do **not** prove complete cmap coverage, every fallback glyph, native menu rendering, a host-OS language edition of the app, or real credential encryption; the language suite never enters credentials and performs no encrypt/decrypt round trip.
 

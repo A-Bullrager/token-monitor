@@ -1,15 +1,23 @@
-// Structural parity between the English landing README and its Chinese twin.
-// Two hand-maintained translations drift: a section gets reworded in one file,
-// an image is swapped only in the other, or a caveat ends up inside a collapsed
+// Structural parity between the English landing README and its translations.
+// Hand-maintained translations drift: a section gets reworded in one file, an
+// image is swapped only in the other, or a caveat ends up inside a collapsed
 // block in one language. Text equality is impossible across languages, so this
-// checks the shape both documents must share.
+// checks the shape every document must share.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
+const require = createRequire(import.meta.url)
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const DOCS = ['README.md', 'README.zh-CN.md']
+// One document per shipped UI language, named after the `lang` attribute that
+// language puts on the page: the English landing README carries no suffix.
+const i18n = require(path.join(root, 'renderer', 'i18n.js'))
+const docFor = (locale) => (i18n.HTML_LANG[locale] === 'en'
+  ? 'README.md'
+  : `README.${i18n.HTML_LANG[locale]}.md`)
+const DOCS = i18n.LOCALES.map(docFor)
 const REQUIRED_BAR = '<p align="right">'
 const REQUIRED_HERO = '<div align="center">'
 
@@ -46,19 +54,42 @@ for (const doc of parsed) {
   const open = (doc.scannable.match(/<details\b/g) || []).length
   const close = (doc.scannable.match(/<\/details>/g) || []).length
   assert.equal(open, close, `${doc.file} has unbalanced <details> blocks (${open} open, ${close} closed)`)
+  // A collapsed block without a summary has no toggle label: it renders as an
+  // empty disclosure triangle, and only someone reading the source notices.
+  const summaries = (doc.scannable.match(/<summary\b/g) || []).length
+  assert.equal(summaries, open, `${doc.file} has ${open} <details> blocks but ${summaries} <summary> labels`)
 }
 
-// Same heading depth sequence, so neither document gains or loses a section.
-assert.deepEqual(
-  parsed[0].headings,
-  parsed[1].headings,
-  `section structure differs: ${parsed[0].file} has ${parsed[0].headings.length} headings, ` +
-  `${parsed[1].file} has ${parsed[1].headings.length} (${JSON.stringify(parsed[0].headings)} vs ${JSON.stringify(parsed[1].headings)})`
-)
+// The switch bar is the only navigation between the documents: every file must
+// offer a link to every other language and mark itself as the current one.
+const barLine = (doc) => doc.text.split(/\r?\n/).find((line) => line.startsWith(REQUIRED_BAR)) || ''
+for (const [index, doc] of parsed.entries()) {
+  const line = barLine(doc)
+  assert.ok(line.includes('<strong>'), `${doc.file} must mark its own language as current`)
+  for (const [otherIndex, other] of parsed.entries()) {
+    if (otherIndex === index) continue
+    assert.ok(line.includes(other.file), `${doc.file} language bar must link to ${other.file}`)
+  }
+  assert.equal((line.match(/<strong>/g) || []).length, 1,
+    `${doc.file} language bar must mark exactly one current language`)
+}
 
-// Both documents must show the same screenshots; only the order may differ.
-const first = [...new Set(parsed[0].images)].sort()
-const second = [...new Set(parsed[1].images)].sort()
-assert.deepEqual(first, second, `screenshot sets differ: ${JSON.stringify([first, second])}`)
+// Same heading depth sequence in every document, so none gains or loses a
+// section relative to the English landing page.
+const reference = parsed.find((doc) => doc.file === 'README.md')
+assert.ok(reference, 'README.md must be part of the checked documents')
+for (const doc of parsed) {
+  if (doc === reference) continue
+  assert.deepEqual(doc.headings, reference.headings,
+    `section structure differs: ${reference.file} has ${reference.headings.length} headings, ` +
+    `${doc.file} has ${doc.headings.length} (${JSON.stringify(reference.headings)} vs ${JSON.stringify(doc.headings)})`)
+}
 
-console.log(`Documentation structure matches: ${DOCS.join(', ')} (${first.length} screenshots, ${parsed[0].headings.length} headings)`)
+// Every document must show the same screenshots; only the order may differ.
+const first = [...new Set(reference.images)].sort()
+for (const doc of parsed.slice(1)) {
+  const images = [...new Set(doc.images)].sort()
+  assert.deepEqual(images, first, `${doc.file} screenshot set differs from ${reference.file}: ${JSON.stringify([first, images])}`)
+}
+
+console.log(`Documentation structure matches: ${DOCS.join(', ')} (${first.length} screenshots, ${reference.headings.length} headings)`)

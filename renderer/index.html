@@ -328,12 +328,18 @@
             <p class="set-note">浅色是默认外观；深色适合夜间或深色桌面。</p>
             <div class="field inline">
               <span class="field-label"><span class="micro">LANGUAGE</span></span>
-              <!-- ASCII on purpose: the shipped MiSans subset has no 语言英文 glyphs,
-                   and a Chinese label here would silently depend on a system font. -->
-              <div class="seg" id="localeSeg" role="group" aria-label="LANGUAGE">
+              <!-- Native names, ASCII where the shipped subset cannot do better:
+                   MiSans has no 语 / 言 glyphs, so the Chinese option stays
+                   "Chinese" instead of "中文". Everything else uses its own
+                   spelling, and scripts/glyph-demand.mjs proves the bundled
+                   Inter subset carries the accents these names need. -->
+              <div class="seg seg-wrap" id="localeSeg" role="group" aria-label="LANGUAGE">
                 <button type="button" data-locale="auto">Auto</button>
                 <button type="button" data-locale="zh">Chinese</button>
                 <button type="button" data-locale="en">English</button>
+                <button type="button" data-locale="es">Español</button>
+                <button type="button" data-locale="pt-BR">Português</button>
+                <button type="button" data-locale="de">Deutsch</button>
               </div>
             </div>
           </section>
@@ -350,7 +356,7 @@
 
           <section class="set-section about">
             <h3>关于</h3>
-            <p class="set-note">Token Monitor <span id="versionText">v2.5.0</span> · 本地优先 · 非官方 DeepSeek 客户端。余额来自官方 API；用量来自平台会话接口，可能随平台调整。</p>
+            <p class="set-note">Token Monitor <span id="versionText">v2.6.0</span> · 本地优先 · 非官方 DeepSeek 客户端。余额来自官方 API；用量来自平台会话接口，可能随平台调整。</p>
             <p class="set-note credit">Fonts: Inter (SIL OFL 1.1) · MiSans (Xiaomi, royalty-free commercial license)</p>
             <div class="set-actions space">
               <button class="text-btn" type="button" id="footerUsage">平台用量页 ↗</button>
@@ -370,6 +376,10 @@
   </div>
 
   <script src="i18n.js"></script>
+  <script src="locales/en.js"></script>
+  <script src="locales/es.js"></script>
+  <script src="locales/pt-BR.js"></script>
+  <script src="locales/de.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

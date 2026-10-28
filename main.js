@@ -17,6 +17,12 @@ const store = require('./lib/store')
 const deepseek = require('./lib/deepseek')
 const { buildDemoState } = require('./lib/demo')
 const i18n = require('./renderer/i18n')
+// The tray, the application menu and the IPC error strings are written here,
+// not in the renderer — so the main process needs the same dictionaries
+// loaded, or a Spanish UI would still get a Chinese tray menu.
+for (const locale of i18n.LOCALES.filter((item) => item !== 'zh')) {
+  i18n.register(locale, require(`./renderer/locales/${locale}`)(i18n))
+}
 
 // Effective UI language. The renderer needs it before its first paint, so it
 // travels in the window URL instead of waiting for an IPC round trip.
@@ -30,7 +36,7 @@ function refreshLocale() {
   appLocale = i18n.resolveLocale(LOCALE_OVERRIDE || store.get().locale, preferred)
   return appLocale
 }
-// Copy written in Chinese; translated only when the UI language is English.
+// Copy authored in Chinese; every other UI language reads it from a dictionary.
 const t = (text) => i18n.t(text, appLocale)
 
 app.setName('Token Monitor')

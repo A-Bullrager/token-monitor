@@ -16,16 +16,18 @@ const I18N = window.TmI18n
 // The main process resolves 'auto' against the system language and passes the
 // result in the URL, so the very first paint is already in the right language.
 const LOCALE = I18N && I18N.LOCALES.includes(QUERY.get('locale')) ? QUERY.get('locale') : 'zh'
-// Copy is authored in Chinese; English is derived, and Chinese stays untouched.
+// Copy is authored in Chinese; every other UI language reads it from a
+// dictionary keyed by that exact Chinese string.
+const TRANSLATE = LOCALE !== 'zh'
 const t = (text) => (I18N ? I18N.t(text, LOCALE) : text)
 function applyLanguage(root) {
-  if (I18N && LOCALE === 'en') I18N.applyTree(root || document.body, LOCALE)
+  if (I18N && TRANSLATE) I18N.applyTree(root || document.body, LOCALE)
 }
-// English mode translates text where it is written, so no render path has to
-// remember to translate. Translated output no longer matches the CJK test, so
-// the observer cannot feed on its own writes.
+// Non-Chinese modes translate text where it is written, so no render path has
+// to remember to translate. Translated output no longer matches the CJK test,
+// so the observer cannot feed on its own writes.
 function installLanguageMirror() {
-  if (!I18N || LOCALE !== 'en' || typeof MutationObserver === 'undefined') return
+  if (!I18N || !TRANSLATE || typeof MutationObserver === 'undefined') return
   const observer = new MutationObserver((records) => {
     for (const record of records) {
       if (record.type === 'characterData') {
@@ -75,7 +77,7 @@ const state = {
   switching: false,
   loading: true,
   error: '',
-  version: '2.5.0',
+  version: '2.6.0',
   clearArmed: false,
   clearTimer: null,
   refreshTimer: null,
@@ -152,14 +154,13 @@ function plainMoney(value, digits = 2) {
 function formatTokens(value) {
   if (value == null || !Number.isFinite(Number(value))) return '—'
   const n = Number(value)
-  // 万 / 亿 are grouping units with no English wording, so English re-scales
-  // into compact notation instead of transliterating the Chinese grouping.
-  if (LOCALE === 'en' && n >= 1e4) {
-    return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
-  }
+  // 万 / 亿 are Chinese grouping units with no wording in the other shipped
+  // languages, so they re-scale into whatever that language writes itself:
+  // 12.5K, 12,5 mil, 12.500.
+  if (TRANSLATE && n >= 1e4) return I18N.compactCount(n, LOCALE)
   if (n >= 1e8) return `${(n / 1e8).toFixed(2)} 亿`
   if (n >= 1e4) return `${(n / 1e4).toFixed(n >= 1e6 ? 0 : 1)} 万`
-  return Math.round(n).toLocaleString('en-US')
+  return Math.round(n).toLocaleString(I18N ? I18N.localeTag(LOCALE) : 'en-US')
 }
 
 function formatRunway(value) {
@@ -333,9 +334,9 @@ function depletionDate(days) {
   const date = new Date()
   date.setHours(12, 0, 0, 0)
   date.setDate(date.getDate() + Math.round(value))
-  if (LOCALE === 'en') {
-    return `Runs out ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-  }
+  // Authored once, in Chinese: each dictionary turns it into "Runs out Mar 5",
+  // "Se agota 5 mar", "Acaba 5 de mar.", "Am 5. März leer" — so the phrase a
+  // notice composes around it (`… · 仅 1 个消费日`) can reuse the same rule.
   return `约 ${date.getMonth() + 1} 月 ${date.getDate()} 日见底`
 }
 

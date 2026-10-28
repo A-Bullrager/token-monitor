@@ -6,10 +6,15 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import vm from 'node:vm'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
+const require = createRequire(import.meta.url)
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const source = fs.readFileSync(path.join(root, 'lib', 'store.js'), 'utf8')
+// store.js takes its accepted languages from the translation registry; the
+// sandbox hands it that same real module rather than a copy of the list.
+const i18n = require(path.join(root, 'renderer', 'i18n.js'))
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-store-'))
 const secret = 'sk-mock-only-9876'
 
@@ -71,6 +76,7 @@ function makeStore({ platform, backend = null, available = true, hang = false, a
       if (id === 'electron') return { app: { getPath: () => dir }, safeStorage }
       if (id === 'node:fs') return fs
       if (id === 'node:path') return path
+      if (id === '../renderer/i18n') return i18n
       throw new Error(`Unexpected import ${id}`)
     }
   }
@@ -236,6 +242,31 @@ try {
     assert.equal(reloaded.secrets().sessionToken, 'mock-session')
     passed++
     console.log('PASS config survives a non-ASCII profile path.')
+  }
+
+  // 10) The accepted languages come from the translation registry, so a new
+  // dictionary is a valid setting the moment it ships — and anything else is
+  // ignored rather than written to disk and rendered as an unset language.
+  {
+    const dir = freshDir('locale-setting')
+    const store = makeStore({ platform: 'win32', available: false, dir })
+    for (const locale of ['auto', ...i18n.LOCALES]) {
+      const view = await store.save({ locale })
+      assert.equal(view.locale, locale, `${locale} must be accepted as a language setting`)
+      assert.equal(disk(dir).locale, locale, `${locale} must survive to disk`)
+      assert.equal(makeStore({ platform: 'win32', available: false, dir }).get().locale, locale,
+        `${locale} must survive a restart`)
+    }
+    for (const bad of ['fr', 'es-MX', 'EN', '', 'auto ']) {
+      const last = i18n.LOCALES[i18n.LOCALES.length - 1]
+      assert.equal((await store.save({ locale: bad })).locale, last,
+        `${JSON.stringify(bad)} has no dictionary and must not change the saved language`)
+    }
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ locale: 'fr-FR' }))
+    assert.equal(makeStore({ platform: 'win32', available: false, dir }).get().locale, 'auto',
+      'a language read from disk must still be one of the shipped ones')
+    passed++
+    console.log(`PASS language setting accepts exactly the shipped dictionaries: ${i18n.LOCALES.join(', ')}.`)
   }
 
   console.log(`\nStorage contract tests passed: ${passed} groups (mocked backends, not real OS keyrings).`)

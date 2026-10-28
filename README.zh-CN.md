@@ -1,4 +1,4 @@
-<p align="right"><a href="./README.md">EN</a> | <strong>简体中文</strong></p>
+<p align="right"><a href="./README.md">EN</a> | <strong>简体中文</strong> | <a href="./README.es.md">Español</a> | <a href="./README.pt-BR.md">Português</a> | <a href="./README.de.md">Deutsch</a></p>
 
 <div align="center">
     <img src="build/icon.png" alt="Token Monitor" width="96">
@@ -13,7 +13,7 @@
     </p>
 </div>
 
-日常缩成条带，需要时展开账本，用 `30D / 7D` 两种消费节奏估算「还能用多久」。界面提供**中文与英文**：默认「自动」按系统语言选择，中文系统保持中文、其他语言给英文界面，也可以在设置里固定选一种。基于 Electron 45、原生 DOM 与 SVG；无需中转服务器，不做遥测。
+日常缩成条带，需要时展开账本，用 `30D / 7D` 两种消费节奏估算「还能用多久」。界面提供**中文、英文、西班牙语、巴西葡萄牙语和德语**：默认「自动」按系统语言前缀选择，五种语言也都可以在设置里固定。基于 Electron 45、原生 DOM 与 SVG；无需中转服务器，不做遥测。
 
 ## 展示
 
@@ -32,6 +32,11 @@
 <td width="33%" align="center"><img src="shots/settings.png" width="290" alt="设置抽屉"><br><sub><b>设置</b> —— 凭证、刷新、主题、语言与快捷键</sub></td>
 <td width="33%" align="center"><img src="shots/dark.png" width="290" alt="深色主题"><br><sub><b>深色</b> —— 适合夜间或深色桌面</sub></td>
 <td width="33%" align="center"><img src="shots/empty.png" width="290" alt="未连接状态"><br><sub><b>未连接</b> —— 填入凭证前是演示数据</sub></td>
+</tr>
+<tr>
+<td width="33%" align="center"><img src="shots/deck-es.png" width="290" alt="西班牙语账本"><br><sub><b>Español</b> —— <i>Autonomía</i>、<i>Recarga / bono</i>、<i>Se agota 5 mar</i></sub></td>
+<td width="33%" align="center"><img src="shots/deck-pt-BR.png" width="290" alt="巴西葡萄牙语账本"><br><sub><b>Português (Brasil)</b> —— <i>Autonomia</i>、<i>Recarga / bônus</i>、<i>Acaba 5 de mar.</i></sub></td>
+<td width="33%" align="center"><img src="shots/deck-de.png" width="290" alt="德语账本"><br><sub><b>Deutsch</b> —— <i>Reichweite</i>、<i>Aufladung / Gutschrift</i>、<i>Am 5. März leer</i></sub></td>
 </tr>
 </table>
 
@@ -55,7 +60,8 @@
 ## 下载与运行
 
 发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
-**当前发布的是 [v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0)** —— 双语界面那一版。四个原生 runner 全部通过，发布页附了六件程序包与 `SHA256SUMS.txt`。Windows 包已从发布页原件重新下载，哈希与清单一致，并在本机解包启动通过全部断言；Linux 与 macOS 包只由各自 runner 的解包 / 安装校验覆盖，没有在开发者真机上复验。
+**当前发布的是 [v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0)** —— 中英双语那一版。四个原生 runner 全部通过，发布页附了六件程序包与 `SHA256SUMS.txt`。Windows 包已从发布页原件重新下载，哈希与清单一致，并在本机解包启动通过全部断言；Linux 与 macOS 包只由各自 runner 的解包 / 安装校验覆盖，没有在开发者真机上复验。
+**下面提到的西班牙语、葡萄牙语和德语界面目前只在 `main` 分支上，还没有进入任何已发布版本** —— 现在下载 v2.5.0 只有中文和英文。
 
 | 平台 | 程序包 | 使用方式 |
 | --- | --- | --- |
@@ -163,23 +169,24 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 ## 语言支持
 
-界面文案以中文撰写，英文由**主进程与渲染层共用的同一份词典**（`renderer/i18n.js`）推导，不存在两份各说各话的文案。
+界面文案以中文撰写，其余每一种语言都是一份**以那条中文原文为键**的词典（`renderer/i18n.js` + `renderer/locales/<语言>.js`），由主进程与渲染层共同加载。不存在两份各说各话的文案：`npm run check:i18n` 会在任何词典缺键、用中文回答、漏掉某个插值句式或忘记单复数时直接失败。
 
 | 中文界面 | 英文界面 |
 | --- | --- |
 | ![账本（中文）](shots/deck.png) | ![Ledger (English)](shots/deck-en.png) |
 
-- **翻什么**：两种形态、设置抽屉、快捷键表、通知与错误提示、托盘菜单与提示、macOS 应用菜单。
-- **不翻什么**：产品名、`DeepSeek`，以及语言选择器自身的选项名（刻意的，见下面的字体约束）。
-- **数字与日期随语言走**：中文用 `万 / 亿` 分组、见底写作 `约 3 月 5 日见底`；英文用紧凑记数（`12.5K`、`1.3M`）与 `Runs out Mar 5`。两者描述的是同一个量，检查按数值比较而不是字符串。
-- **刻意不变**：货币符号跟随账户、时钟保持 24 小时制、千分位仍按 `en-US` 分组。
-- 切换语言会保存设置并**重新加载窗口**——这是唯一会触发重载的选项，因为已经写进页面的文字无法就地再翻译一遍。
+- **提供哪些语言**：中文（撰写语言）、英文、西班牙语、巴西葡萄牙语、德语。「自动」按系统语言前缀匹配 `zh*` / `es*` / `pt*` / `de*` / `en*`，其余语言落到英文——它是随包字体无需系统字体就能渲染的那一种。`pt-PT` 因此使用巴西词典，`es-MX` 与 `es-ES` 共用同一份西班牙语。
+- **翻什么**：两种形态、设置抽屉、快捷键表、通知与错误提示、托盘菜单与提示、macOS 应用菜单，以及那些连中文界面也显示成英文的仪器标签（`DAYS`、`TOTAL`、`SAMPLE`、`AVG`、`PEAK ¥29.10 · 10-03`、`SYNCED 18:02:18`）。
+- **不翻什么**：产品名、`Know your runway.` 这句标语、`DeepSeek`、作为字段名的 `API KEY` / `SESSION TOKEN`，以及仪器码 `DEMO`、`SYNC`、`30D / 7D` 和数量级单位 `M` / `K`。
+- **数字与日期随语言走**：中文用 `万 / 亿` 分组、见底写作 `约 3 月 5 日见底`；英文 `12.5K` 与 `Runs out Mar 5`；西班牙语 `12,5 mil` 与 `Se agota 5 mar`；葡萄牙语 `12,5 mil` 与 `Acaba 5 de mar.`；德语 `12.500` 与 `Am 5. März leer`。它们描述的是同一个量，检查按数值比较而不是字符串。
+- **单复数属于语言**：中文不标记语法数量，所以每种语言各自变化被计数的名词（`1 día activo` / `15 días activos`、`1 Tag` / `15 Tage`）。一致性检查会拒绝「单数与复数长得一样」的词典，并把测量值 `1.0` 视为复数。
+- **已知边界**：金额在任何语言都保持同一套小数点写法（`¥145.09`），时钟同理；只有 token 数量按语言自身的分组习惯显示。切换语言会保存设置并**重新加载窗口**——这是唯一会触发重载的选项，因为已经写进页面的文字无法就地再翻译一遍。
 
-**一个真实的字体约束**：随应用打包的 MiSans 子集是按固定语料裁剪的，里面**没有** 语 / 言 / 英 / 文 这四个字。重建子集要重新取得 MiSans 与 Inter 原始字体并加入裁剪步骤，还牵扯下文未解决的 MiSans 许可问题，因此本轮不重建；在新中文文案落回语料之前，语言行只能用 ASCII 的 `LANGUAGE` 与 `Auto / Chinese / English`，而不是 `语言 / 中文`。`npm run test:i18n` 会在任何可见字符越出语料时直接失败——这条检查曾经抓到真问题：等宽标签在 Linux runner 上显示方框，因为字体栈缺少随应用打包的中文回退。
+**一个真实的字体约束**：随应用打包的是裁剪过的字体子集。MiSans 子集按固定语料裁剪，里面**没有** 语 / 言 / 英 / 文 四个字，因此新中文文案必须落回 `scripts/font-corpus.txt`——语言行也因此用 ASCII 的 `LANGUAGE`，中文选项写作 `Chinese` 而不是 `中文`。新语言需要的变音字母（`Á Ã Ç É Í Ó Ø Ú Ü ß á ã ä ç é ê í ñ ó ô õ ö ú ü`）已用 fontTools 对照 Inter 子集的真实 cmap 逐个核对；`scripts/glyph-demand.mjs` 会在任何窗口打开之前，因词典索取语料之外的字符而失败。`npm run test:i18n` 再对屏幕上真正出现的字符复核一次语料归属——这条检查曾经抓到真问题：等宽标签在 Linux runner 上显示方框，因为字体栈缺少随应用打包的中文回退。
 
 ## 测试与验证范围
 
-**本地验证（Windows 10 x64）：** 数据测试、21 组模拟存储后端断言、源码 UI、便携目录和实际 ZIP 解包启动均通过；11 个语言 / 时区场景、共 44 个界面状态通过，英文模式屏幕上的中文字符数为 0，采集字符均在语料内。另用 fontTools 检查现有语料的实际字体 cmap，未发现覆盖缺口。
+**本地验证（Windows 10 x64）：** 数据测试、22 组模拟存储后端断言、词典一致性、字形需求检查、源码 UI、便携目录和实际 ZIP 解包启动均通过；16 个语言场景 × 4 个界面状态全部通过，翻译模式下屏幕上的中文字符数为 0，采集字符均在语料内，且没有任何一种语言的标签被裁掉。另用 fontTools 对照真实子集 cmap：词典能放上屏幕的拉丁字符都在 Inter 子集里，需求集里的汉字至少命中一个随包字体。
 
 **云端共八轮，当前发布版本在四个原生 runner 上全绿。** 逐轮过程折叠在下面；折叠里只放过程叙述，能被证明「不成立」的结论一律留在折叠外面。
 
@@ -212,11 +219,12 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 | --- | --- |
 | `npm test` | 依次运行数据、存储、UI、语言环境测试 |
 | `npm run check:release` | 版本号一致性门禁：`package.json` / 锁文件 / 渲染层两处字面量必须同版本，标签必须等于 `v` + 版本 |
-| `npm run check:docs` | 两份 README 的同构门禁：章节结构一致、截图集合一致、markdown / HTML / 跨语言链接无死链、`<details>` 成对 |
+| `npm run check:i18n` | 各语言词典的一致性门禁：键集合相同、插值句式相同、不许用中文回答、单数与复数必须不同形；外加对照 `scripts/font-corpus.txt` 的字形需求检查 |
+| `npm run check:docs` | 五份 README 的同构门禁：每份都要链到其他四种语言并标出自己为当前语言，章节结构一致、截图集合一致、markdown / HTML / 跨语言链接无死链、`<details>` 成对 |
 | `npm run test:parse` | 数据解析、聚合、双节奏与边界情况，无需图形界面 |
-| `npm run test:store` | 21 组模拟系统后端断言：懒探测、pending 拒写、密文沿用与 `plain:` 升级；不代替真实密钥环验证 |
-| `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样，以及切换英文后重载、再次启动仍为英文。除最后一步外都显式固定中文，否则宿主语言一变断言就跟着漂（CI runner 的宿主语言是英语，第一版就在这里全线失败） |
-| `npm run test:i18n` | 下述 Chromium 语言 / 时区、界面语言解析、翻译完整性与字体检查 |
+| `npm run test:store` | 22 组模拟系统后端断言：懒探测、pending 拒写、密文沿用、`plain:` 升级，以及「可保存的语言必须等于随包词典」；不代替真实密钥环验证 |
+| `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样，切换英文后重载并再次启动仍是英文，以及依次切到西班牙语 / 葡萄牙语 / 德语的完整回路：窗口必须重载、重新打开设置时选中的语言要重新高亮。除刻意不固定的那几步外都显式固定中文，否则宿主语言一变断言就跟着漂（CI runner 的宿主语言是英语，第一版就在这里全线失败） |
+| `npm run test:i18n` | 下述 Chromium 语言 / 时区、界面语言解析、翻译完整性、字体与标签溢出检查 |
 | `npm run test:packaged` | `dist/` 目录版启动、字体、版本和形态还原 |
 | `npm run test:distributable` | 从 `release/` 的实际 ZIP / DMG / AppImage 解包并启动其中的可执行文件，不回退到 `dist/` |
 | `npm run render:live` | 运行取证与截图；`npm run shots` 更新展示截图 |
@@ -226,14 +234,15 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 ### 语言环境与字体检查
 
-`test:i18n` 共启动 **11 次**：
+`test:i18n` 共启动 **16 次**：
 
-- 请求七种 Chromium 语言：`zh-CN`、`en-US`、`ja-JP`、`de-DE`、`fr-FR`、`ko-KR`、`ar-SA`。后五种在本机实际规范化为 `ja / de / fr / ko / ar`，报告同时保留请求值和实际值。每个场景还断言**应用解析出了哪种界面语言**（中文保持中文，其他一律英文），英文模式下要求屏幕上不残留任何中文、且词典没有报告未翻条目。
+- 请求十一种 Chromium 语言：`zh-CN`、`en-US`、`es-ES`、`es-MX`、`pt-BR`、`pt-PT`、`de-DE`、`ja-JP`、`fr-FR`、`ko-KR`、`ar-SA`。Chromium 会规范化其中一些（`ja-JP` → `ja`，`es-MX` → 中性的 `es-419`），报告同时保留请求值和实际值。每个场景都断言**应用解析出了哪种界面语言**：`zh*` 保持中文，`es*` / `pt*` / `de*` / `en*` 用各自词典，没有词典的语言（日语、法语、韩语、阿拉伯语）落到英文。任何翻译模式下都要求屏幕上不残留中文、且词典没有报告未翻条目。
 - 另两次通过 CDP 模拟 Chromium 时区：`Pacific/Kiritimati`（UTC+14）与 `Pacific/Niue`（UTC−11），不改变宿主或主进程时区。
-- 再加两次手动覆盖：在 `zh-CN` 下强制英文、在 `en-US` 下强制中文，验证选择器能压过浏览器语言——这正是设置里那个选项做的事。
+- 再加三次手动覆盖：在 `zh-CN` 下强制英文、在 `en-US` 下强制中文、在 `de-DE` 下强制西班牙语，验证选择器能压过浏览器语言——这正是设置里那个选项做的事。
 - 每次使用独立、含中文与空格的 profile，检查配置落盘；遍历浅色条带、浅色账本、设置、深色账本四个状态。
-- 余额、跑道、今日花费与 `zh-CN` 基准逐字符串比较；tokens 因两种语言分组方式不同，改为按数值比较（相对误差 2% 内）；不要求时钟、日期与日期相关标签相同。
-- 检查 Inter / MiSans 的 FontFace 状态：中文模式下两者都必须已加载，英文模式下 MiSans 允许保持 `unloaded`（屏幕没有中文，浏览器按需加载本就不取它，这不是缺陷）；采集的 DOM 字符必须属于 `scripts/font-corpus.txt`；中文模式还通过 CDP `CSS.getPlatformFontsForNode` 读取「会话」标签实际命中的平台字体，确认它使用打包的 MiSans 子集（Windows 实测：修复前落到系统 NSimSun，Linux runner 上直接显示方框）。
+- 余额、跑道、今日花费与 `zh-CN` 基准逐字符串比较；tokens 按数值比较，并按每种语言自己的分组习惯解析（`1096 万`、`11M`、`11 M`、`11 Mio.`）；不要求时钟、日期与日期相关标签相同。
+- 检查 Inter / MiSans 的 FontFace 状态：中文模式下两者都必须已加载，翻译模式下 MiSans 允许保持 `unloaded`（屏幕没有中文，浏览器按需加载本就不取它，这不是缺陷）；采集的 DOM 字符必须属于 `scripts/font-corpus.txt`；中文模式还通过 CDP `CSS.getPlatformFontsForNode` 读取「会话」标签实际命中的平台字体，确认它使用打包的 MiSans 子集（Windows 实测：修复前落到系统 NSimSun，Linux runner 上直接显示方框）。
+- **每个可见标签都会与自己的盒子尺寸比对**（`scrollWidth` 与最近的裁剪祖先），因为语言变长时文字明明翻译正确、却被切掉一半，而字符类检查完全看不见这一点。首版西班牙语 / 葡萄牙语 / 德语的三处溢出正是这条断言抓到的。
 
 这些检查**不证明字体 cmap 完整覆盖、所有 fallback 字形、原生菜单、其他宿主 OS 语言版本或真实密钥加密**；语言测试本身不填写凭证，也不做加解密往返。
 界面数字分组固定 `en-US`、时钟为 24 小时制；中文用 `万 / 亿` 大数单位，英文改用紧凑记数，两者表示同一数量。这些检查仍不覆盖宿主操作系统的语言版本，也不覆盖原生菜单的实际渲染。
