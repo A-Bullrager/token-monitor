@@ -31,7 +31,8 @@ Screenshots illustrate the interface; they are not a statement about any particu
 ## Download and run
 
 Releases: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Development builds are in the Artifacts of each Actions run.
-**[v2.4.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.4.1) is published**: all four native runners green, six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, checked against the checksum list, extracted and launched on a real Windows 10 machine. The Linux and macOS packages are covered by their own runners only.
+**The current published release is [v2.4.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.4.1)**: all four native runners green, six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, checked against the checksum list, extracted and launched on a real Windows 10 machine. The Linux and macOS packages are covered by their own runners only.
+**The bilingual 2.5.0 has been built and tested green on all four runners (`d62fc57`) but is not tagged or published yet**, so the release page currently offers 2.4.1.
 
 | Platform | Package | How to run it |
 | --- | --- | --- |
@@ -167,6 +168,10 @@ The UI is authored in Chinese; English is derived from a single dictionary share
 **Cloud round 4 (`036e326`, all four green)**: the Intel race reproduced, the retry recovered it on the second attempt, and both the ZIP-extraction and DMG-install paths passed; all four runners uploaded their packages.
 
 **Cloud round 5 (`v2.4.1` tag, run 40642992704)**: pushing the tag on its own triggered the tag pipeline as expected, all four runners passed, and the release job verified the six packages, generated `SHA256SUMS.txt` and published. The Windows package re-downloaded from the release page matched the checksum list and passed every assertion locally (`isPackaged`, version, no keychain probe at startup, DPAPI label in settings). Linux and macOS packages were only covered by their own runners.
+
+**The first bilingual commit (`1cedcc6`) failed on all four runners at once**: the assertions were written for the Chinese interface while the runner hosts answer in English, so `auto` resolved English. The product behaved correctly and the test assumption did not. The fix makes the regression state the language it asserts (see `test:ui` above) and deliberately leaves only the "switch to English, then restart" step unpinned.
+
+**Second bilingual attempt (`d62fc57`, all four green)**: on English-hosted Linux and macOS runners the 11 language / timezone scenarios, the UI regression and the extracted AppImage plus DMG-install launch checks all passed, producing 2.5.0 packages for every platform.
 
 **What the macOS keychain really means in CI**: running from source probes `keychain` (the unsigned Electron entry is pre-authorized on the runner), while the **packaged app stays at `pending`** — the system never answers. The checks now accept and report that instead of hanging, but it means **real Keychain encryption in the packaged macOS app has never been verified anywhere**, and this README does not claim it has.
 

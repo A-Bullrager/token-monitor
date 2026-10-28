@@ -31,7 +31,8 @@
 ## 下载与运行
 
 发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
-**[v2.4.1 Release](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.4.1) 已发布**：四个原生 runner 全绿，六件程序包 + `SHA256SUMS.txt` 已附上。Windows 包已从其发布页原件下载后在本机解包启动并通过全部断言；Linux 与 macOS 包由各自 runner 的解包 / 安装校验覆盖，未在开发者真机上复验。
+**当前已发布的最新版是 [v2.4.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.4.1)**：四个原生 runner 全绿，六件程序包 + `SHA256SUMS.txt` 已附上。Windows 包已从其发布页原件下载后在本机解包启动并通过全部断言；Linux 与 macOS 包由各自 runner 的解包 / 安装校验覆盖，未在开发者真机上复验。
+**中英双语的 2.5.0 已在四个 runner 上构建并测试全绿（`d62fc57`），但尚未打标签发布**，因此发布页上暂时只有 2.4.1。
 
 | 平台 | 程序包 | 使用方式 |
 | --- | --- | --- |
@@ -168,6 +169,10 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 **云端第四轮（`036e326`，四组全绿）：** Intel 那次竞态确实复现了，重试机制在第二次尝试时把 DMG 构建救回来（日志留有一条 detach 重试提示），随后 ZIP 解包与 DMG 复制安装两条路径都通过；四个 runner 各自上传了程序包 Artifacts。
 
 **云端第五轮（`v2.4.1` 标签，run 40642992704）：** 单独推标签后 tag 流水线如期触发，四个 runner 全绿，Release job 校验六件程序包、生成 `SHA256SUMS.txt` 并发布。从发布页重新下载的 Windows 包 SHA256 与清单一致，并在本机解包启动通过全部断言（`isPackaged`、`v2.4.1`、启动不探测钥匙串、设置抽屉显示 DPAPI）。Linux 与 macOS 的包只经过各自 runner 的解包 / 安装校验，没有在开发者的真机上复验。
+
+**双语第一版（`1cedcc6`）在四个 runner 上同时失败**：断言写的是中文文案，而 runner 宿主语言是英语，`auto` 解析出了英文界面。产品行为是对的，测试假设是错的——修复方式是让回归显式钉住自己要断言的语言（见上表 `test:ui`），只保留"切英文后重启"那一步不钉。
+
+**双语第二版（`d62fc57`，四组全绿）：** 英文宿主的 Linux 与 macOS runner 上，11 个语言 / 时区场景、UI 回归、AppImage 与 DMG + ZIP 的解包 / 安装启动校验全部通过；`2.5.0` 的三个平台程序包均已产出。
 
 **macOS 钥匙串在 CI 的真实结论：** 源码运行探测到 `keychain`（未签名 Electron 的条目在 runner 上已授权），而**打包应用始终停在 `pending`**——系统不回答。现在的检查把这作为已报告的结果接受（应用照常启动、渲染、通过全部界面断言），不再因此挂死；但这意味着**打包版 macOS 的真实钥匙串加密仍未被任何环境验证过**，README 不把它当作已验证。
 
