@@ -31,7 +31,7 @@
 ## 下载与运行
 
 发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
-**云端最新一轮（`036e326`）：Windows x64、Linux x64、macOS arm64、macOS Intel 四组全部通过，六件程序包已作为 Artifacts 上传；Release 要等版本标签推送后才创建。**
+**[v2.4.1 Release](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.4.1) 已发布**：四个原生 runner 全绿，六件程序包 + `SHA256SUMS.txt` 已附上。Windows 包已从其发布页原件下载后在本机解包启动并通过全部断言；Linux 与 macOS 包由各自 runner 的解包 / 安装校验覆盖，未在开发者真机上复验。
 
 | 平台 | 程序包 | 使用方式 |
 | --- | --- | --- |
@@ -151,7 +151,9 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 **云端第四轮（`036e326`，四组全绿）：** Intel 那次竞态确实复现了，重试机制在第二次尝试时把 DMG 构建救回来（日志留有一条 detach 重试提示），随后 ZIP 解包与 DMG 复制安装两条路径都通过；四个 runner 各自上传了程序包 Artifacts。
 
-**macOS 钥匙串在 CI 的真实结论：** 源码运行探测到 `keychain`（未签名 Electron 的条目在 runner 上已授权），而**打包应用两次都停在 `pending`**——系统始终不回答。现在的检查把这作为已报告的结果接受（应用照常启动、渲染、通过全部界面断言），不再因此挂死；但这意味着**打包版 macOS 的真实钥匙串加密仍未被任何环境验证过**，README 不把它当作已验证。
+**云端第五轮（`v2.4.1` 标签，run 40642992704）：** 单独推标签后 tag 流水线如期触发，四个 runner 全绿，Release job 校验六件程序包、生成 `SHA256SUMS.txt` 并发布。从发布页重新下载的 Windows 包 SHA256 与清单一致，并在本机解包启动通过全部断言（`isPackaged`、`v2.4.1`、启动不探测钥匙串、设置抽屉显示 DPAPI）。Linux 与 macOS 的包只经过各自 runner 的解包 / 安装校验，没有在开发者的真机上复验。
+
+**macOS 钥匙串在 CI 的真实结论：** 源码运行探测到 `keychain`（未签名 Electron 的条目在 runner 上已授权），而**打包应用始终停在 `pending`**——系统不回答。现在的检查把这作为已报告的结果接受（应用照常启动、渲染、通过全部界面断言），不再因此挂死；但这意味着**打包版 macOS 的真实钥匙串加密仍未被任何环境验证过**，README 不把它当作已验证。
 
 | 命令 | 检查范围 |
 | --- | --- |
@@ -214,7 +216,7 @@ tag 带 `-`（如 `v2.4.0-beta.1`）会标为预发布；普通版本 tag 发布
 3. 无需配置 PAT：Release job 已声明 `contents: write`，使用自带的 `GITHUB_TOKEN`；组织策略仍可能限制执行或授权。
 4. 用户明确确认后才提交 / 推送。云端结果以实际运行为准，不把本地修改当作已上线。
 
-**tag 建议单独推送。** 本仓库实测：`git push --atomic origin main refs/tags/v2.4.0` 只产生了 `main` 的一次运行，`v2.4.0` 没有对应的 tag 运行，Release 也没创建。官方文档只写明「一次推送超过三个 tag 不会创建事件」，并未定义分支与 tag 同推时的行为，所以这里把同推视为不可靠路径：先推代码，确认工作流已在默认分支，再单独推 tag。
+**tag 必须单独推送。** 本仓库正反两面都实测过：`git push --atomic origin main refs/tags/v2.4.0` 只产生了 `main` 的一次运行，`v2.4.0` 没有对应 tag 运行，Release 也没创建（该标签至今是一个没有发布物的空标记）；后来单独 `git push origin v2.4.1` 则立刻触发了 tag 流水线并发布。官方文档只写明「一次推送超过三个 tag 不会创建事件」，并未定义分支与 tag 同推时的行为，所以这里把同推视为不可靠路径。
 
 ```bash
 git push origin main          # 第一步：让四个 runner 先在新提交上跑绿
