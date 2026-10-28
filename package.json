@@ -1,0 +1,24 @@
+{
+  "name": "token-monitor",
+  "productName": "Token Monitor",
+  "version": "2.4.0",
+  "description": "A warm paper runway instrument for DeepSeek balance and token spend.",
+  "main": "main.js",
+  "author": "Token Monitor contributors",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/launch.mjs",
+    "showcase": "node scripts/launch.mjs --showcase",
+    "shots": "node scripts/shots.mjs",
+    "test:parse": "node scripts/test-parse.mjs",
+    "test:ui": "node scripts/ui-smoke.mjs",
+    "test:packaged": "node scripts/packaged-check.mjs",
+    "render:live": "node scripts/live-render.mjs",
+    "package:win": "electron-packager . \"Token Monitor\" --platform=win32 --arch=x64 --out=dist --overwrite --icon=build/icon.ico --asar --ignore=\"^/dist\" --ignore=\"^/shots\" --ignore=\"^/node_modules\" --ignore=\"^/scripts\" --ignore=\"^/build\""
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "45.0.0"
+  }
+}

@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Token Monitor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="theme-light view-strip">
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9.5 3.5h5l-.9 4.7 3.4 4.1v1.6H13v5.7l-1 .9-1-.9v-5.7H7v-1.6l3.4-4.1-.9-4.7Z"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 7h8.2M17.8 7H20M4 17h2.2M11.8 17H20"/><circle cx="15" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></symbol>
+    <symbol id="i-minimize" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m8 14 4-4 4 4"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m10 8 4 4-4 4"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.2 6.4M20 4v7h-7"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="m4 4 16 16M9.9 6.8A9.7 9.7 0 0 1 12 6.5c6 0 9.5 5.5 9.5 5.5a16 16 0 0 1-2.8 3.4M6.6 8.2A16.5 16.5 0 0 0 2.5 12S6 17.5 12 17.5c1.4 0 2.6-.3 3.7-.7"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.7 9.3a2.4 2.4 0 0 1 4.7.7c0 1.6-2.1 1.8-2.1 3.4M12 16.8v.2"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8M7.2 6.4a8 8 0 1 0 9.6 0"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.2 4.2L19 6.8"/></symbol>
+  </svg>
+
+  <div class="stage" id="stage">
+    <div class="stage-caption" aria-hidden="true">
+      <span class="caption-kicker">TOKEN MONITOR / RUNWAY INSTRUMENT</span>
+      <h1>Know your runway.</h1>
+      <p>把账户余额变成一条看得见的跑道。<br>DeepSeek 余额与用量的桌面仪器。</p>
+      <span class="caption-foot">30D ACTIVE PACE · LOCAL-FIRST · WINDOWS</span>
+    </div>
+
+    <main class="panel" id="panel" aria-label="Token Monitor">
+      <span class="grain" aria-hidden="true"></span>
+
+      <!-- ── 横向条带：日常驻留形态 ───────────────────────── -->
+      <section class="strip" id="stripView" aria-label="余额跑道">
+        <header class="strip-head drag">
+          <div class="brand">
+            <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M12 12 16.5 7.5" fill="none" stroke="var(--copper)" stroke-width="1.7" stroke-linecap="round"/>
+              <circle cx="12" cy="12" r="1.25" fill="var(--copper)"/>
+            </svg>
+            <span class="brand-name">Token Monitor</span>
+            <span class="brand-slash">/</span>
+            <span class="brand-sub">DeepSeek</span>
+            <span class="demo-tag" id="stripDemoTag">DEMO</span>
+          </div>
+          <div class="strip-tools no-drag">
+            <button class="status-inline" id="stripStatus" type="button" data-action="settings" title="账户状态">
+              <i class="dot"></i><span id="stripStatusText">SAMPLE</span>
+            </button>
+            <div class="win-actions">
+              <button class="icon-btn" data-action="pin" title="窗口置顶" aria-label="窗口置顶" aria-pressed="true"><svg><use href="#i-pin"></use></svg></button>
+              <button class="icon-btn" data-action="settings" title="设置" aria-label="设置"><svg><use href="#i-gear"></use></svg></button>
+              <button class="icon-btn" data-action="close" title="退出" aria-label="退出"><svg><use href="#i-close"></use></svg></button>
+            </div>
+          </div>
+        </header>
+
+        <div class="strip-main" data-action="expand" role="button" tabindex="0" aria-label="展开账本">
+          <div class="strip-runway">
+            <span class="micro">RUNWAY / 预计可用</span>
+            <div class="runway-line">
+              <span class="runway-num serif" id="stripRunway">—</span>
+              <span class="runway-unit">DAYS</span>
+            </div>
+            <span class="pace-caption" id="stripPaceCaption">按 30 天活跃日</span>
+          </div>
+
+          <div class="strip-scale">
+            <div class="scale-head">
+              <span class="micro">余额续航</span>
+              <span class="scale-value mono" id="stripBalance">¥—</span>
+            </div>
+            <div class="linear-gauge" id="stripGauge">
+              <div class="lg-zones" aria-hidden="true"><i class="z-low"></i><i class="z-watch"></i><i class="z-safe"></i></div>
+              <div class="lg-ticks" id="stripTicks" aria-hidden="true"></div>
+              <div class="lg-needle" id="stripNeedle" aria-hidden="true"><i></i></div>
+            </div>
+            <div class="scale-foot">
+              <span class="mono" id="stripPace">¥— / 天</span>
+              <span class="micro faint" id="stripUpdated">SYNC —</span>
+            </div>
+          </div>
+
+          <div class="strip-today">
+            <span class="micro">TODAY / 今日</span>
+            <span class="today-value mono" id="stripToday">¥—</span>
+            <svg class="spark" id="stripSpark" viewBox="0 0 96 26" aria-hidden="true"></svg>
+            <span class="micro faint" id="stripTokens">— TOKENS</span>
+          </div>
+
+          <button class="expand-btn no-drag" data-action="expand" title="展开账本" aria-label="展开账本">
+            <svg><use href="#i-down"></use></svg>
+          </button>
+        </div>
+
+        <footer class="strip-foot">
+          <span class="micro faint" id="stripFootNote">DEEPSEEK API · 本地凭证</span>
+          <span class="strip-foot-right">
+            <button class="text-btn tiny" data-action="privacy" title="隐藏金额" aria-label="隐藏金额"><svg><use href="#i-eye"></use></svg></button>
+            <button class="text-btn tiny" data-action="refresh" id="stripRefresh" title="刷新">刷新</button>
+            <span class="micro faint" id="stripFootPace">30D</span>
+          </span>
+        </footer>
+      </section>
+
+      <!-- ── 展开账本：完整仪表形态 ───────────────────────── -->
+      <section class="deck" id="deckView" aria-label="Token Monitor 账本">
+        <header class="deck-head drag">
+          <div class="brand">
+            <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M12 12 16.5 7.5" fill="none" stroke="var(--copper)" stroke-width="1.7" stroke-linecap="round"/>
+              <circle cx="12" cy="12" r="1.25" fill="var(--copper)"/>
+            </svg>
+            <span class="brand-name">Token Monitor</span>
+            <span class="brand-slash">/</span>
+            <span class="brand-sub">DeepSeek</span>
+            <span class="demo-tag" id="deckDemoTag">DEMO</span>
+          </div>
+          <div class="deck-tools no-drag">
+            <button class="status-inline" id="deckStatus" type="button" data-action="settings" title="账户状态">
+              <i class="dot"></i><span id="deckStatusText">SAMPLE</span>
+            </button>
+            <div class="win-actions">
+              <button class="icon-btn" data-action="collapse" title="收起" aria-label="收起账本"><svg><use href="#i-up"></use></svg></button>
+              <button class="icon-btn" data-action="pin" title="窗口置顶" aria-label="窗口置顶" aria-pressed="true"><svg><use href="#i-pin"></use></svg></button>
+              <button class="icon-btn" data-action="settings" title="设置" aria-label="设置"><svg><use href="#i-gear"></use></svg></button>
+              <button class="icon-btn" data-action="minimize" title="最小化" aria-label="最小化"><svg><use href="#i-minimize"></use></svg></button>
+              <button class="icon-btn" data-action="close" title="退出" aria-label="退出"><svg><use href="#i-close"></use></svg></button>
+            </div>
+          </div>
+        </header>
+
+        <div class="deck-scroll" id="deckScroll">
+          <div class="notice" id="notice" hidden>
+            <span class="notice-mark" aria-hidden="true"></span>
+            <span class="notice-text" id="noticeText"></span>
+            <button class="text-btn" id="noticeAction" type="button">去设置</button>
+          </div>
+
+          <section class="hero">
+            <div class="gauge-block">
+              <div class="section-eyebrow"><span class="micro">RUNWAY / 预计可用</span><span class="rule"></span></div>
+              <div class="gauge" id="gauge">
+                <svg class="gauge-svg" id="gaugeSvg" viewBox="0 0 220 190" aria-hidden="true"></svg>
+                <div class="gauge-center">
+                  <div class="gauge-number" id="gaugeNumber"><span class="serif" id="deckRunway">—</span><span class="unit">天</span></div>
+                  <div class="gauge-caption" id="gaugeCaption">按 30 天活跃日</div>
+                </div>
+              </div>
+              <div class="pace-toggle" role="group" aria-label="跑道节奏">
+                <button type="button" data-pace="30d" id="pace30">30 天</button>
+                <button type="button" data-pace="7d" id="pace7">7 天</button>
+              </div>
+              <div class="gauge-note" id="gaugeNote">余额 ÷ 有消费日期的日均</div>
+            </div>
+
+            <div class="ledger">
+              <div class="ledger-total">
+                <span class="micro">TREASURY / 账户余额</span>
+                <div class="ledger-money" id="ledgerMoney"><span class="currency">¥</span><span class="serif" id="deckBalance">—</span></div>
+                <div class="ledger-sub" id="deckBalanceSub">充值 ¥0.00 · 赠金 ¥0.00</div>
+              </div>
+              <dl class="ledger-rows">
+                <div>
+                  <dt>TODAY / 今日</dt>
+                  <dd><span class="mono" id="deckToday">¥—</span><small id="deckTodayTokens">—</small></dd>
+                </div>
+                <div>
+                  <dt>PACE / 日均</dt>
+                  <dd><span class="mono" id="deckPace">¥—</span><small id="deckPaceCaption">30 天活跃日</small></dd>
+                </div>
+                <div>
+                  <dt>WINDOW / 近 30 天</dt>
+                  <dd><span class="mono" id="deckThirty">¥—</span><small id="deckThirtySub">—</small></dd>
+                </div>
+              </dl>
+              <div class="ledger-volume">
+                <span class="micro">VOLUME / 30 天 tokens</span>
+                <span class="mono" id="deckTokens">—</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="fuel">
+            <div class="fuel-head">
+              <span class="micro">COMPOSITION / 余额构成</span>
+              <span class="micro faint" id="fuelTotal">¥—</span>
+            </div>
+            <div class="fuel-bar" id="fuelBar">
+              <span class="fuel-topup" id="fuelTopup"></span>
+              <span class="fuel-grant" id="fuelGrant"></span>
+            </div>
+            <div class="fuel-legend" id="fuelLegend"></div>
+          </section>
+
+          <section class="chart-section">
+            <div class="section-head">
+              <div class="section-title"><span class="micro">LEDGER / 每日花费</span><span class="section-note">近 30 天</span></div>
+              <div class="section-stat"><span class="serif" id="chartTotal">¥—</span><span class="micro">TOTAL</span></div>
+            </div>
+            <div class="chart-wrap" id="chartWrap">
+              <svg class="chart-svg" id="chart" viewBox="0 0 460 150" preserveAspectRatio="none" role="img" aria-label="近 30 天每日花费"></svg>
+              <div class="chart-tooltip" id="chartTip" hidden></div>
+              <div class="chart-empty" id="chartEmpty" hidden>
+                <span class="micro">NO LEDGER YET</span>
+                <p>接入平台会话后，这里会留下每天的花费。</p>
+                <button class="text-btn" data-action="settings">补充 Session Token</button>
+              </div>
+            </div>
+            <div class="chart-foot">
+              <span id="chartStart">—</span>
+              <span class="chart-peak" id="chartPeak">PEAK ¥—</span>
+              <span id="chartEnd">—</span>
+            </div>
+          </section>
+
+          <section class="mix-section">
+            <div class="section-head">
+              <div class="section-title"><span class="micro">MIX / 模型构成</span><span class="section-note" id="mixNote">近 30 天</span></div>
+              <div class="section-stat"><span class="serif" id="mixEffective">—</span><span class="micro">EFFECTIVE / M TOKENS</span></div>
+            </div>
+            <div class="mix-bar" id="mixBar"></div>
+            <div class="mix-list" id="mixList"></div>
+            <div class="mix-empty" id="mixEmpty" hidden>暂无模型明细</div>
+          </section>
+
+          <section class="outlook" aria-label="两种节奏对照">
+            <span class="micro">OUTLOOK / 节奏对照</span>
+            <div class="outlook-cells">
+              <button class="outlook-cell" type="button" data-pace="30d" id="outlook30">
+                <span class="outlook-key">30D</span><b class="serif" id="outlookDays30">—</b><span class="outlook-unit">天</span>
+              </button>
+              <button class="outlook-cell" type="button" data-pace="7d" id="outlook7">
+                <span class="outlook-key">7D</span><b class="serif" id="outlookDays7">—</b><span class="outlook-unit">天</span>
+              </button>
+              <span class="outlook-cell static">
+                <span class="outlook-key">预计月耗</span><b class="serif" id="outlookForecast">—</b>
+              </span>
+            </div>
+          </section>
+        </div>
+
+        <footer class="deck-foot">
+          <div class="foot-left">
+            <span class="dot" id="footDot"></span>
+            <span class="micro" id="updatedText">SYNCED —</span>
+            <span class="micro faint" id="footMode">DEMO / 样本数据</span>
+          </div>
+          <div class="foot-actions">
+            <button class="text-btn tiny" data-action="privacy" title="隐藏金额" aria-label="隐藏金额"><svg><use href="#i-eye"></use></svg></button>
+            <button class="text-btn" data-action="refresh" id="deckRefresh"><svg><use href="#i-refresh"></use></svg>刷新</button>
+            <button class="text-btn" data-action="usage">用量页 ↗</button>
+          </div>
+        </footer>
+      </section>
+
+      <!-- ── 设置抽屉 ───────────────────────────────────── -->
+      <div class="sheet-scrim" id="sheetScrim" hidden></div>
+      <aside class="settings-sheet" id="settingsSheet" aria-hidden="true" aria-label="设置">
+        <header class="settings-head drag">
+          <div>
+            <span class="micro">CONFIG / 参数</span>
+            <h2>设置</h2>
+          </div>
+          <button class="icon-btn no-drag" id="sheetClose" type="button" title="关闭设置" aria-label="关闭设置"><svg><use href="#i-close"></use></svg></button>
+        </header>
+
+        <div class="settings-scroll">
+          <section class="set-section">
+            <div class="set-title"><h3>连接</h3><div class="conn-row"><span class="conn" id="connApi"><i class="dot"></i>API</span><span class="conn" id="connSession"><i class="dot"></i>会话</span></div></div>
+            <label class="field">
+              <span class="field-label"><span class="micro">API KEY</span><em>余额</em></span>
+              <input id="apiKeyInput" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false">
+              <small id="apiKeyHint">尚未保存</small>
+            </label>
+            <label class="field">
+              <span class="field-label"><span class="micro">SESSION TOKEN</span><em>用量明细 · 可选</em></span>
+              <input id="sessionInput" type="password" placeholder="Bearer token 或整段 Authorization" autocomplete="off" spellcheck="false">
+              <small id="sessionHint">尚未保存，填写后才能获取真实用量</small>
+            </label>
+            <div class="set-actions">
+              <button id="testBtn" class="line-btn" type="button">测试连接</button>
+              <button id="helpBtn" class="text-btn" type="button">怎么获取 Token</button>
+            </div>
+            <div id="helpBox" class="help-box" hidden>
+              <p>API Key 用于余额，来自 <b>platform.deepseek.com/api_keys</b>。用量明细需要用浏览器登录平台，F12 → Network → 任意 <code>api/v0</code> 请求，复制 <code>Authorization</code> 里 Bearer 后面的部分。</p>
+              <button class="text-btn" type="button" id="usageLink">打开平台用量页 ↗</button>
+            </div>
+            <div id="testResult" class="test-result" hidden></div>
+            <div id="sheetError" class="sheet-error" hidden></div>
+          </section>
+
+          <section class="set-section">
+            <h3>行为</h3>
+            <label class="field inline">
+              <span class="field-label"><span class="micro">自动刷新</span></span>
+              <select id="intervalSelect">
+                <option value="30">30 秒</option>
+                <option value="60">1 分钟</option>
+                <option value="300">5 分钟</option>
+              </select>
+            </label>
+            <div class="switch-row">
+              <div><span>使用演示数据</span><small>用固定样本预览界面，不读取真实账户</small></div>
+              <button id="demoSwitch" class="switch" type="button" role="switch" aria-checked="true"><i></i></button>
+            </div>
+            <div class="switch-row">
+              <div><span>窗口置顶</span><small>让仪器浮在其他窗口上方</small></div>
+              <button id="pinSwitch" class="switch" type="button" role="switch" aria-checked="true"><i></i></button>
+            </div>
+          </section>
+
+          <section class="set-section">
+            <h3>外观</h3>
+            <div class="seg" id="themeSeg" role="group" aria-label="主题">
+              <button type="button" data-theme="light">浅色</button>
+              <button type="button" data-theme="dark">深色</button>
+              <button type="button" data-theme="system">跟随系统</button>
+            </div>
+            <p class="set-note">浅色是默认外观；深色适合夜间或深色桌面。</p>
+          </section>
+
+          <section class="set-section">
+            <h3>键位</h3>
+            <dl class="key-list">
+              <div><dt>刷新账户</dt><dd><kbd>Ctrl</kbd><span>+</span><kbd>R</kbd></dd></div>
+              <div><dt>打开设置</dt><dd><kbd>Ctrl</kbd><span>+</span><kbd>,</kbd></dd></div>
+              <div><dt>展开 / 收起</dt><dd><kbd>E</kbd></dd></div>
+              <div><dt>关闭设置或收起</dt><dd><kbd>Esc</kbd></dd></div>
+            </dl>
+          </section>
+
+          <section class="set-section about">
+            <h3>关于</h3>
+            <p class="set-note">Token Monitor <span id="versionText">v2.3.0</span> · 本地优先 · 非官方 DeepSeek 客户端。余额来自官方 API；用量来自平台会话接口，可能随平台调整。</p>
+            <div class="set-actions space">
+              <button class="text-btn" type="button" id="footerUsage">平台用量页 ↗</button>
+              <button class="text-btn danger" type="button" id="clearBtn">清除凭证</button>
+            </div>
+          </section>
+        </div>
+
+        <footer class="settings-foot">
+          <span class="micro faint">DPAPI 加密 · 只保存在本机</span>
+          <button id="saveBtn" class="ink-btn" type="button">保存并同步</button>
+        </footer>
+      </aside>
+
+      <div class="toast" id="toast" hidden></div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

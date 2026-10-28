@@ -1,0 +1,4 @@
+node_modules/
+dist/
+shots/run.log
+shots/ui-report.json
