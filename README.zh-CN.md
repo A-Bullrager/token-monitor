@@ -1,12 +1,48 @@
 <p align="right"><a href="./README.md">EN</a> | <strong>简体中文</strong></p>
 
-# Token Monitor
+<div align="center">
+    <img src="build/icon.png" alt="Token Monitor" width="96">
+    <h1>Token Monitor</h1>
+    <p><em>Know your runway —— 把 DeepSeek 余额与用量做成桌面仪器。</em></p>
+    <p>
+        <a href="https://github.com/A-Bullrager/token-monitor/releases"><img src="https://img.shields.io/github/v/release/A-Bullrager/token-monitor?style=flat-square&label=release&color=22c55e" alt="Latest release"></a>
+        <img src="https://img.shields.io/badge/Windows-x64-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows x64">
+        <img src="https://img.shields.io/badge/macOS-arm64%20%7C%20x64-0A84FF?style=flat-square&logo=apple&logoColor=white" alt="macOS arm64 and x64">
+        <img src="https://img.shields.io/badge/Linux-x64-64748b?style=flat-square&logo=linux&logoColor=white" alt="Linux x64">
+        <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-A855F7?style=flat-square" alt="License: MIT"></a>
+    </p>
+</div>
 
-把 **DeepSeek 余额与用量**放在桌面上的小仪表：日常缩成条带，需要时展开账本，用 `30D / 7D` 两种消费节奏估算「还能用多久」。
+日常缩成条带，需要时展开账本，用 `30D / 7D` 两种消费节奏估算「还能用多久」。界面提供**中文与英文**：默认「自动」按系统语言选择，中文系统保持中文、其他语言给英文界面，也可以在设置里固定选一种。基于 Electron 45、原生 DOM 与 SVG；无需中转服务器，不做遥测。
 
-**界面提供中文与英文。** 默认「自动」按系统语言选择：中文系统保持中文，其他语言给英文界面；设置里也可以固定选一种。基于 Electron 45、原生 DOM 与 SVG；无需中转服务器，不做遥测。[English documentation](README.md)
+## 展示
 
-![展开后的账本](shots/deck.png)
+下面所有图片都跑的是本地演示数据，用来说明界面长什么样，不构成对任何一次测试结果的证明。
+
+<table>
+<tr>
+<td width="50%" align="center"><img src="shots/deck.png" width="440" alt="展开后的账本（中文）"><br><sub><b>账本</b> —— 跑道仪表、余额、近 30 天花费曲线、模型构成与缓存命中率</sub></td>
+<td width="50%" align="center"><img src="shots/deck-en.png" width="440" alt="The same ledger in English"><br><sub><b>账本（英文）</b> —— 同一界面，英文文案</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="shots/strip.png" width="440" alt="日常驻留的条带（中文）"><br><sub><b>条带</b> —— 日常形态：可用天数、余额、今日花费与迷你曲线</sub></td>
+<td width="50%" align="center"><img src="shots/strip-en.png" width="440" alt="The same strip in English"><br><sub><b>条带（英文）</b> —— 同一形态，英文文案</sub></td>
+</tr>
+<tr>
+<td width="33%" align="center"><img src="shots/settings.png" width="290" alt="设置抽屉"><br><sub><b>设置</b> —— 凭证、刷新、主题、语言与快捷键</sub></td>
+<td width="33%" align="center"><img src="shots/dark.png" width="290" alt="深色主题"><br><sub><b>深色</b> —— 适合夜间或深色桌面</sub></td>
+<td width="33%" align="center"><img src="shots/empty.png" width="290" alt="未连接状态"><br><sub><b>未连接</b> —— 填入凭证前是演示数据</sub></td>
+</tr>
+</table>
+
+下面两张来自真实运行窗口而不是摆拍，用来核对真机上的样子与上面一致：
+
+<table>
+<tr>
+<td width="50%" align="center"><img src="shots/live-strip.png" width="420" alt="运行中的条带"><br><sub><b>运行中的条带</b> —— 从实际窗口截取</sub></td>
+<td width="50%" align="center"><img src="shots/live-deck.png" width="420" alt="运行中的账本"><br><sub><b>运行中的账本</b> —— 从实际窗口截取</sub></td>
+</tr>
+</table>
 
 ## 界面与功能
 
@@ -16,25 +52,10 @@
 - **显示与隐私**：浅色 / 深色 / 跟随系统，一键隐藏金额；默认提供本地演示数据。
 - **同步**：手动刷新，或每 30 秒 / 1 分钟 / 5 分钟刷新。
 
-![条带形态](shots/strip.png)
-
-| 设置抽屉 | 深色主题 |
-| --- | --- |
-| ![设置](shots/settings.png) | ![深色](shots/dark.png) |
-
-![未连接状态](shots/empty.png)
-
-运行截图仅作界面参考，不代表本轮或跨平台回归结果：
-
-| 运行中的条带 | 运行中的账本 |
-| --- | --- |
-| ![运行条带](shots/live-strip.png) | ![运行账本](shots/live-deck.png) |
-
 ## 下载与运行
 
 发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
-**当前已发布的最新版是 [v2.4.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.4.1)**：四个原生 runner 全绿，六件程序包 + `SHA256SUMS.txt` 已附上。Windows 包已从其发布页原件下载后在本机解包启动并通过全部断言；Linux 与 macOS 包由各自 runner 的解包 / 安装校验覆盖，未在开发者真机上复验。
-**中英双语的 2.5.0 已在四个 runner 上构建并测试全绿（`d62fc57`），但尚未打标签发布**，因此发布页上暂时只有 2.4.1。
+**当前发布的是 [v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0)** —— 双语界面那一版。四个原生 runner 全部通过，发布页附了六件程序包与 `SHA256SUMS.txt`。Windows 包已从发布页原件重新下载，哈希与清单一致，并在本机解包启动通过全部断言；Linux 与 macOS 包只由各自 runner 的解包 / 安装校验覆盖，没有在开发者真机上复验。
 
 | 平台 | 程序包 | 使用方式 |
 | --- | --- | --- |
@@ -160,6 +181,11 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 **本地验证（Windows 10 x64）：** 数据测试、21 组模拟存储后端断言、源码 UI、便携目录和实际 ZIP 解包启动均通过；11 个语言 / 时区场景、共 44 个界面状态通过，英文模式屏幕上的中文字符数为 0，采集字符均在语料内。另用 fontTools 检查现有语料的实际字体 cmap，未发现覆盖缺口。
 
+**云端共八轮，当前发布版本在四个原生 runner 上全绿。** 逐轮过程折叠在下面；折叠里只放过程叙述，能被证明「不成立」的结论一律留在折叠外面。
+
+<details>
+<summary>云端构建记录（第 1–8 轮）</summary>
+
 **云端第一轮（`9faa78e`，四个原生 runner）：** Windows x64 全绿；Linux x64 在 `ar-SA` 场景把「退出时调试连接先于回复关闭」误判为失败；两个 macOS 架构打包与严格验签成功，但发布物启动校验在首个 CDP 往返超时。
 
 **云端第二轮（`4fb1d4d`）：** Windows x64 仍全绿；Linux 语言测试转绿，失败点变成打包文件名——electron-builder 实际产出 `linux-x86_64.AppImage`，与验包脚本和 Release 契约要求的 `linux-x64` 不一致；两个 macOS 架构仍在同一处超时，但这次带回了进程栈证据：主线程 80/80 次采样停在 `SecItemCopyMatching → SecurityServer → mach_msg`，即启动路径上的**同步钥匙串读取**把主进程整条挂死（源码测试用未签名 Electron，其钥匙串条目在 runner 上已授权，所以只有打包应用会撞上）。
@@ -176,12 +202,17 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 **双语第二版（`d62fc57`，四组全绿）：** 英文宿主的 Linux 与 macOS runner 上，11 个语言 / 时区场景、UI 回归、AppImage 与 DMG + ZIP 的解包 / 安装启动校验全部通过；`2.5.0` 的三个平台程序包均已产出。
 
+**云端第八轮（`v2.5.0` 标签，run 40660748693）：** 单独推标签如期触发 tag 流水线，四个 runner 全绿，Release job 校验六件程序包、生成 `SHA256SUMS.txt` 并发布。从发布页重新下载的 Windows 包 SHA256 与清单一致，并在本机走了解包启动与全部断言；Linux 与 macOS 包只有各自 runner 的覆盖。
+
+</details>
+
 **macOS 钥匙串在 CI 的真实结论：** 源码运行探测到 `keychain`（未签名 Electron 的条目在 runner 上已授权），而**打包应用始终停在 `pending`**——系统不回答。现在的检查把这作为已报告的结果接受（应用照常启动、渲染、通过全部界面断言），不再因此挂死；但这意味着**打包版 macOS 的真实钥匙串加密仍未被任何环境验证过**，README 不把它当作已验证。
 
 | 命令 | 检查范围 |
 | --- | --- |
 | `npm test` | 依次运行数据、存储、UI、语言环境测试 |
 | `npm run check:release` | 版本号一致性门禁：`package.json` / 锁文件 / 渲染层两处字面量必须同版本，标签必须等于 `v` + 版本 |
+| `npm run check:docs` | 两份 README 的同构门禁：章节结构一致、截图集合一致、markdown / HTML / 跨语言链接无死链、`<details>` 成对 |
 | `npm run test:parse` | 数据解析、聚合、双节奏与边界情况，无需图形界面 |
 | `npm run test:store` | 21 组模拟系统后端断言：懒探测、pending 拒写、密文沿用与 `plain:` 升级；不代替真实密钥环验证 |
 | `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样，以及切换英文后重载、再次启动仍为英文。除最后一步外都显式固定中文，否则宿主语言一变断言就跟着漂（CI runner 的宿主语言是英语，第一版就在这里全线失败） |

@@ -46,7 +46,8 @@
     "zip:win": "node scripts/zip-win.mjs",
     "package:win:zip": "node scripts/package-dir.mjs --win && node scripts/zip-win.mjs",
     "package:linux": "electron-builder --linux --publish never",
-    "package:mac": "electron-builder --mac --publish never"
+    "package:mac": "electron-builder --mac --publish never",
+    "check:docs": "node scripts/check-docs.mjs"
   },
   "build": {
     "appId": "com.tokenmonitor.desktop",

@@ -1,12 +1,48 @@
 <p align="right"><strong>EN</strong> | <a href="./README.zh-CN.md">简体中文</a></p>
 
-# Token Monitor
+<div align="center">
+    <img src="build/icon.png" alt="Token Monitor" width="96">
+    <h1>Token Monitor</h1>
+    <p><em>Know your runway — a desktop instrument for DeepSeek balance and usage.</em></p>
+    <p>
+        <a href="https://github.com/A-Bullrager/token-monitor/releases"><img src="https://img.shields.io/github/v/release/A-Bullrager/token-monitor?style=flat-square&label=release&color=22c55e" alt="Latest release"></a>
+        <img src="https://img.shields.io/badge/Windows-x64-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows x64">
+        <img src="https://img.shields.io/badge/macOS-arm64%20%7C%20x64-0A84FF?style=flat-square&logo=apple&logoColor=white" alt="macOS arm64 and x64">
+        <img src="https://img.shields.io/badge/Linux-x64-64748b?style=flat-square&logo=linux&logoColor=white" alt="Linux x64">
+        <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-A855F7?style=flat-square" alt="License: MIT"></a>
+    </p>
+</div>
 
-A small desktop instrument for your **DeepSeek balance and usage**: it rests as a strip, expands into a ledger, and estimates *how long your money lasts* using two spending paces (`30D / 7D`).
+It rests as a strip, expands into a ledger, and estimates *how long your money lasts* using two spending paces (`30D / 7D`). The interface ships in **Chinese and English**: `Auto` follows the system language — Chinese stays Chinese, everything else gets the English interface — and either language can be pinned in Settings. Built on Electron 45 with plain DOM and SVG. No proxy server, no telemetry.
 
-The interface ships in **Chinese and English**. `Auto` follows the system language — Chinese stays Chinese, everything else gets the English interface — and you can pin either language in Settings. Built on Electron 45 with plain DOM and SVG. No proxy server, no telemetry. [简体中文文档](README.zh-CN.md)
+## Showcase
 
-![The expanded ledger](shots/deck-en.png)
+Every image below renders local demo data; they show the interface, and are not evidence about any particular test run.
+
+<table>
+<tr>
+<td width="50%" align="center"><img src="shots/deck-en.png" width="440" alt="The ledger in English"><br><sub><b>Ledger</b> — runway gauge, balance, 30-day spend curve, model mix and cache hit rate</sub></td>
+<td width="50%" align="center"><img src="shots/deck.png" width="440" alt="同一界面的中文版本"><br><sub><b>Ledger (中文)</b> — the same instrument, authored in Chinese</sub></td>
+</tr>
+<tr>
+<td width="50%" align="center"><img src="shots/strip-en.png" width="440" alt="The everyday strip in English"><br><sub><b>Strip</b> — the always-on form in English: runway days, balance, today's spend and a sparkline</sub></td>
+<td width="50%" align="center"><img src="shots/strip.png" width="440" alt="中文条带"><br><sub><b>Strip (中文)</b> — the same form, authored in Chinese</sub></td>
+</tr>
+<tr>
+<td width="33%" align="center"><img src="shots/settings.png" width="290" alt="Settings drawer"><br><sub><b>Settings</b> — credentials, refresh, theme, language and shortcuts</sub></td>
+<td width="33%" align="center"><img src="shots/dark.png" width="290" alt="Dark theme"><br><sub><b>Dark</b> — for night or dark desktops</sub></td>
+<td width="33%" align="center"><img src="shots/empty.png" width="290" alt="Disconnected state"><br><sub><b>Not connected</b> — demo data until you add credentials</sub></td>
+</tr>
+</table>
+
+The two images below come from a live window rather than the staged showcase, as a check that the real thing looks like the pictures above:
+
+<table>
+<tr>
+<td width="50%" align="center"><img src="shots/live-strip.png" width="420" alt="Strip in a live window"><br><sub><b>Live strip</b> — captured from a running window</sub></td>
+<td width="50%" align="center"><img src="shots/live-deck.png" width="420" alt="Ledger in a live window"><br><sub><b>Live ledger</b> — captured from a running window</sub></td>
+</tr>
+</table>
 
 ## What it shows
 
@@ -16,25 +52,10 @@ The interface ships in **Chinese and English**. `Auto` follows the system langua
 - **Display and privacy**: light / dark / system, one click to hide amounts, local demo data by default.
 - **Sync**: manual refresh, or every 30 seconds / 1 minute / 5 minutes.
 
-![The strip](shots/strip-en.png)
-
-| Settings drawer | Dark theme |
-| --- | --- |
-| ![Settings](shots/settings.png) | ![Dark](shots/dark.png) |
-
-![Disconnected state](shots/empty.png)
-
-Screenshots illustrate the interface; they are not a statement about any particular test run:
-
-| Strip in a live window | Ledger in a live window |
-| --- | --- |
-| ![Live strip](shots/live-strip.png) | ![Live deck](shots/live-deck.png) |
-
 ## Download and run
 
 Releases: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Development builds are in the Artifacts of each Actions run.
-**The current published release is [v2.4.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.4.1)**: all four native runners green, six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, checked against the checksum list, extracted and launched on a real Windows 10 machine. The Linux and macOS packages are covered by their own runners only.
-**The bilingual 2.5.0 has been built and tested green on all four runners (`d62fc57`) but is not tagged or published yet**, so the release page currently offers 2.4.1.
+**[v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0) is the current release** — the bilingual interface build. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and was extracted and launched on a real Windows 10 machine; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop.
 
 | Platform | Package | How to run it |
 | --- | --- | --- |
@@ -159,6 +180,11 @@ The UI is authored in Chinese; English is derived from a single dictionary share
 
 **Local (Windows 10 x64)**: data tests, 21 mocked storage-backend assertions, source UI, directory build and a real ZIP extraction and launch all pass; 11 language scenarios × 4 interface states pass, and every collected character is inside the corpus. fontTools was used to check the actual subset cmaps against that corpus with no gaps found.
 
+**Eight cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat.
+
+<details>
+<summary>Cloud build history (rounds 1–8)</summary>
+
 **Cloud round 1 (`9faa78e`, four native runners)**: Windows x64 green; Linux x64 misread "the debugger socket closed before the reply" during shutdown as a failure; both macOS builds signed and verified, but the packaged-app launch check timed out on its first CDP round trip.
 
 **Cloud round 2 (`4fb1d4d`)**: Windows still green; the Linux language suite went green and the failure moved to the package name — electron-builder emits `linux-x86_64.AppImage` while the checks and release contract expect `linux-x64`. Both macOS jobs still timed out, but this time with process stacks: 80 of 80 samples sat in `SecItemCopyMatching → SecurityServer → mach_msg`, i.e. a **synchronous keychain read on the startup path** had frozen the main process (the source tests use unsigned Electron, whose keychain entry is already authorized on the runner, so only the packaged app hit it).
@@ -175,12 +201,17 @@ The UI is authored in Chinese; English is derived from a single dictionary share
 
 **Second bilingual attempt (`d62fc57`, all four green)**: on English-hosted Linux and macOS runners the 11 language / timezone scenarios, the UI regression and the extracted AppImage plus DMG-install launch checks all passed, producing 2.5.0 packages for every platform.
 
+**Cloud round 8 (`v2.5.0` tag, run 40660748693)**: pushing the tag on its own triggered the tag pipeline, all four runners passed, and the release job checked the six packages, generated `SHA256SUMS.txt` and published. The Windows package was re-downloaded from the release page, its SHA256 matched the list, and it was extracted and launched here through the same assertions as any other build. The Linux and macOS packages are covered by their own runners only.
+
+</details>
+
 **What the macOS keychain really means in CI**: running from source probes `keychain` (the unsigned Electron entry is pre-authorized on the runner), while the **packaged app stays at `pending`** — the system never answers. The checks now accept and report that instead of hanging, but it means **real Keychain encryption in the packaged macOS app has never been verified anywhere**, and this README does not claim it has.
 
 | Command | What it covers |
 | --- | --- |
 | `npm test` | Data, storage, UI and language-environment suites in order |
 | `npm run check:release` | Version gate: `package.json`, lockfile and the two renderer literals must agree, and a tag must equal `v` + version |
+| `npm run check:docs` | Parity gate between the two READMEs: same section structure, same screenshots, no broken markdown, HTML or cross-language links, balanced `<details>` |
 | `npm run test:parse` | Parsing, aggregation, both paces and edge cases; no GUI needed |
 | `npm run test:store` | 21 assertions over mocked system backends: lazy probe, refusal while pending, ciphertext retention and `plain:` upgrade; not a real keyring |
 | `npm run test:ui` | Forms, themes, privacy, settings, credential branches and clearing, restart restore, morph sampling, and the language switch followed by a restart that must still be English. Every phase except the last pins Chinese, because the assertions are written for one language and the host language is not ours to assume (the first version of this failed on all four runners, whose hosts answer in English) |
