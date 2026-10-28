@@ -1,14 +1,16 @@
-// Chromium locale / language environment check, NOT translated UI testing.
-// The UI remains Chinese. --lang selects the renderer language; CDP timezone
-// overrides simulate Chromium timezones, not the host OS language or timezone
-// (nor the Electron main process timezone). Each scenario gets a fresh profile
-// with CJK characters and spaces, and exercises strip/light, deck/light,
-// settings/light and deck/dark. Only fixed demo numeric strings are compared
-// with zh-CN; clocks, dates and date-dependent labels are not equality probes.
+// Chromium locale / language environment check. The UI ships in Chinese and
+// English; 'auto' resolves from the browser language, so each scenario below
+// also asserts WHICH language the interface came up in, that no Chinese text
+// survives in English mode, and that the numbers mean the same thing in both.
+// The timezone scenarios use CDP emulation, which does not change the host OS
+// or the Electron main process. Each scenario gets a fresh profile with CJK
+// characters and spaces, and exercises strip/light, deck/light, settings/light
+// and deck/dark. Only fixed demo values are compared with the zh baseline.
 //
 // FontFace loading, DOM corpus membership and a representative monospace CJK
-// label's actual platform font are checked. This is NOT a full font cmap or
-// per-glyph fallback audit, native menu test, or encryption round-trip test.
+// label's actual platform font are checked in Chinese mode. This is NOT a full
+// font cmap or per-glyph fallback audit, native menu test, or encryption
+// round-trip test.
 // Usage: node scripts/i18n-check.mjs [--keep-shots]
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -40,8 +42,22 @@ const SCENARIOS = [
   { name: 'ko', lang: 'ko-KR' },
   { name: 'ar', lang: 'ar-SA' },
   { name: 'tz+', lang: 'zh-CN', tz: 'Pacific/Kiritimati', offsetMinutes: -840 },
-  { name: 'tz-', lang: 'zh-CN', tz: 'Pacific/Niue', offsetMinutes: 660 }
+  { name: 'tz-', lang: 'zh-CN', tz: 'Pacific/Niue', offsetMinutes: 660 },
+  // The picker must win over the browser language in both directions.
+  { name: 'force-en', lang: 'zh-CN', locale: 'en' },
+  { name: 'force-zh', lang: 'en-US', locale: 'zh' }
 ]
+// 'auto' is the shipped default: Chinese stays Chinese, everything else gets
+// the English interface, which is what the assertions below check per scenario.
+const expectedLocale = (scenario) => scenario.locale || (/^zh/i.test(scenario.lang) ? 'zh' : 'en')
+// 万 / 亿 and compact K / M / B describe the same quantity in different groupings.
+const COUNT_UNITS = { 亿: 1e8, 万: 1e4, K: 1e3, M: 1e6, B: 1e9 }
+function countValue(text) {
+  const match = String(text).replace(/,/g, '').match(/([\d.]+)\s?(亿|万|K|M|B)?/)
+  if (!match) return null
+  return Number(match[1]) * (COUNT_UNITS[match[2]] || 1)
+}
+const CJK_VISIBLE = /[一-鿿-﫿]/
 const EXPECTED_STATES = {
   strip: { view: 'strip', theme: 'light', settingsOpen: false },
   deck: { view: 'deck', theme: 'light', settingsOpen: false },
@@ -82,6 +98,20 @@ const COLLECT = `(() => {
   const sheet = document.getElementById('settingsSheet')
   return {
     chars: [...chars].join(''),
+    // Chinese glyphs still on screen in English mode.
+    cjk: (() => {
+      const found = new Set()
+      const scan = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+      let text
+      while ((text = scan.nextNode())) {
+        const host = text.parentElement
+        if (!host || !visible(host)) continue
+        for (const ch of text.nodeValue) if (/[\\u4e00-\\u9fff]/.test(ch)) found.add(ch)
+      }
+      return [...found].join('')
+    })(),
+    untranslated: window.TmI18n ? window.TmI18n.untranslated.slice() : null,
+    lang: document.documentElement.lang,
     locale: {
       language: navigator.language,
       languages: [...navigator.languages],
@@ -141,6 +171,16 @@ function validateState(scenario, state, data) {
   // Accept that canonical form, but never accept a different language/region.
   assert(actual === requested || actual === requested.split('-')[0],
     `${label}: expected navigator.language=${scenario.lang} or its language-only form, got ${data.locale.language}`)
+  const expectedUi = scenario.expectedUiLocale || expectedLocale(scenario)
+  assert(data.lang === (expectedUi === 'en' ? 'en' : 'zh-CN'),
+    `${label}: <html lang> must be ${expectedUi === 'en' ? 'en' : 'zh-CN'}, got ${data.lang}`)
+  if (expectedUi === 'en') {
+    assert(!data.cjk, `${label}: Chinese text survived in English mode: ${data.cjk}`)
+    assert(Array.isArray(data.untranslated) && data.untranslated.length === 0,
+      `${label}: the dictionary could not translate ${JSON.stringify(data.untranslated)}`)
+  } else {
+    assert(data.cjk.length > 0, `${label}: Chinese mode displayed no Chinese at all`)
+  }
   if (scenario.tz) {
     assert(data.locale.timeZone === scenario.tz && data.locale.offsetMinutes === scenario.offsetMinutes,
       `${label}: Chromium timezone override failed: ${JSON.stringify(data.locale)}`)
@@ -153,7 +193,16 @@ function validateState(scenario, state, data) {
     data.ui.settingsAriaHidden === String(!expected.settingsOpen) && data.ui.demoVisible,
   `${label}: unexpected actual UI state: ${JSON.stringify(data.ui)}`)
   for (const [family, loaded] of [['Inter', data.fonts.interLoaded], ['MiSans', data.fonts.misansLoaded]]) {
-    // FontFaceSet.check alone can succeed when the requested family is absent.
+    // FontFaceSet.check can succeed even when the requested family is absent,
+    // so the face status is inspected as well. MiSans is only *required* where
+    // Chinese is on screen: with no CJK glyph in use, the browser legitimately
+    // never fetches it and the face stays "unloaded".
+    const required = family === 'Inter' || expectedUi === 'zh'
+    if (!required) {
+      assert(!loaded || data.fonts.faces.some((face) => face.family === family && face.status === 'loaded'),
+        `${label}: MiSans reported loaded without a loaded face: ${JSON.stringify(data.fonts)}`)
+      continue
+    }
     assert(loaded && data.fonts.faces.some((face) => face.family === family && face.status === 'loaded'),
       `${label}: ${family} webfont not loaded: ${JSON.stringify(data.fonts)}`)
   }
@@ -163,6 +212,17 @@ function validateState(scenario, state, data) {
   if (scenario.name !== 'zh') {
     const baseline = results.find((run) => run.name === 'zh').states[state].probes
     for (const probe of NUMERIC_PROBES) {
+      if (probe === 'tokens') {
+        // Token counts are grouped by 万/亿 in Chinese and by K/M/B in English;
+        // compare the quantity they both describe, not the spelling.
+        const left = countValue(data.probes[probe])
+        const right = countValue(baseline[probe])
+        assert(left !== null && right !== null,
+          `${label}: cannot compare token counts ${data.probes[probe]} / ${baseline[probe]}`)
+        assert(Math.abs(left - right) / Math.max(1, right) < 0.02,
+          `${label}: token count differs from zh-CN: ${data.probes[probe]} vs ${baseline[probe]}`)
+        continue
+      }
       assert(data.probes[probe] === baseline[probe],
         `${label}: ${probe} differs from zh-CN: ${JSON.stringify(data.probes[probe])} != ${JSON.stringify(baseline[probe])}`)
     }
@@ -176,9 +236,13 @@ async function runScenario(scenario) {
   delete env.ELECTRON_RUN_AS_NODE
   // Do not use env.TZ: it does not reliably affect Chromium across platforms.
   // Port 0 and the child's own debugger URL avoid attaching to another app.
-  const args = [root, '--remote-debugging-port=0', `--user-data-dir=${profileDir}`, `--lang=${scenario.lang}`]
+  const args = [
+    root, '--remote-debugging-port=0', `--user-data-dir=${profileDir}`, `--lang=${scenario.lang}`,
+    ...(scenario.locale ? [`--locale=${scenario.locale}`] : [])
+  ]
   const entry = {
     name: scenario.name, lang: scenario.lang, chromiumTimeZone: scenario.tz || null,
+    forcedLocale: scenario.locale || null, expectedUiLocale: expectedLocale(scenario),
     profileDir, configFile: path.join(profileDir, 'config.json'), states: {}
   }
   results.push(entry) // Preserve partial results if any assertion fails.
@@ -305,7 +369,7 @@ async function runScenario(scenario) {
         disk.theme === theme && disk.paceMode === '30d' && disk.apiKeyEnc === '' && disk.sessionTokenEnc === '',
       `${scenario.name}: unexpected persisted config (${theme})`)
       const boot = await evaluate('window.tm.bootstrap()')
-      for (const key of ['demo', 'view', 'theme', 'paceMode', 'intervalSec', 'alwaysOnTop']) {
+      for (const key of ['demo', 'view', 'theme', 'paceMode', 'intervalSec', 'alwaysOnTop', 'locale']) {
         assert(disk[key] === boot.config[key], `${scenario.name}: disk/bootstrap mismatch for ${key}`)
       }
       assert(boot.view === 'deck' && !boot.config.hasApiKey && !boot.config.hasSession,
@@ -335,7 +399,9 @@ async function runScenario(scenario) {
     await waitFor("document.getElementById('stripBalance')?.textContent?.trim() === '¥145.09'", 'demo render')
     const boot = await evaluate('window.tm.bootstrap()')
     // main.js app:bootstrap reports these fields; neither proves encryption.
-    entry.bootstrap = { platform: boot.platform, encryption: boot.encryption, view: boot.view, config: boot.config }
+    entry.bootstrap = { platform: boot.platform, locale: boot.locale, encryption: boot.encryption, view: boot.view, config: boot.config }
+    assert(boot.locale === expectedLocale(scenario),
+      `${scenario.name}: the app resolved ${boot.locale}, expected ${expectedLocale(scenario)}`)
     assert(boot.config.demo === true && !boot.config.hasApiKey && !boot.config.hasSession &&
       boot.view === 'strip' && boot.config.view === 'strip' && boot.config.theme === 'light',
     `${scenario.name}: expected fresh demo/strip/light bootstrap without credentials`)
@@ -350,7 +416,9 @@ async function runScenario(scenario) {
     await waitFor("document.getElementById('settingsSheet').classList.contains('open')", 'settings open')
     await sleep(400) // Allow the settings sheet transition to finish for capture.
     await capture('settings')
-    await verifyMonoCjk()
+    // The bundled-font check needs a Chinese label; English mode shows ASCII
+    // there, so it only applies where CJK is actually on screen.
+    if (expectedLocale(scenario) === 'zh') await verifyMonoCjk()
 
     await evaluate("document.querySelector('#themeSeg [data-theme=\"dark\"]').click()")
     await evaluate("document.getElementById('saveBtn').click()")
@@ -393,9 +461,10 @@ async function runScenario(scenario) {
 }
 
 const summary = {
-  scope: 'Chinese UI under Chromium language environments; not translated UI or host OS language editions',
+  scope: 'Chinese and English UI under Chromium language environments; the UI ships in these two languages only, not in the host OS language of each scenario',
+  uiLocaleScope: 'auto resolves Chinese browser languages to the Chinese UI and everything else to English; force-en / force-zh check the manual override',
   timezoneScope: 'CDP Chromium timezone emulation only; host OS and main process timezone unchanged',
-  fontScope: 'FontFace loading, corpus membership and a representative monospace CJK label actual platform font; no exhaustive cmap/fallback audit',
+  fontScope: 'FontFace loading, corpus membership and, in Chinese mode, a representative monospace CJK label actual platform font; no exhaustive cmap/fallback audit',
   encryptionScope: 'bootstrap platform/encryption are reported only; no credential or encryption round-trip tests',
   numericProbes: NUMERIC_PROBES,
   profileParent,

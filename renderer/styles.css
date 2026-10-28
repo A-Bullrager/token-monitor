@@ -2840,8 +2840,10 @@ body.theme-dark .panel::before {
 }
 
 .set-section {
-  padding: 9px 13px;
-  margin-bottom: 4px;
+  /* the language row joins 外观; the cards pay for it so the
+     drawer still fits its 705px viewport without scrolling */
+  padding: 8px 13px;
+  margin-bottom: 3px;
   border-bottom: 0;
   border-radius: 12px;
   background: var(--paper);

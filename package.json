@@ -1,7 +1,7 @@
 {
   "name": "token-monitor",
   "productName": "Token Monitor",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "description": "DeepSeek 余额与用量的桌面跑道仪器 — an always-on-top runway instrument for DeepSeek balance and token spend.",
   "main": "main.js",
   "author": "A-Storm",

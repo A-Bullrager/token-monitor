@@ -565,6 +565,43 @@ try {
   await session.evaluate("document.querySelector('.deck-head [data-action=\"collapse\"]').click()")
   await session.waitFor('collapsed before exit', viewExpr('view-strip'))
   await quit()
+  // Language is the one setting that reloads the window, so this phase does not
+  // ride the navigation: it verifies the persisted choice, restarts the app and
+  // checks the fresh page comes up in English without any CLI override.
+  session = await launch('localeSwitch')
+  await session.waitFor('strip before language change',
+    `${viewExpr('view-strip')} && document.getElementById('stripBalance')?.textContent?.trim() === '¥145.09'`)
+  await session.evaluate("document.querySelector('.strip-main').click()")
+  await session.waitFor('deck for language change', viewExpr('view-deck'))
+  await session.evaluate("document.querySelector('.deck-head [data-action=\"settings\"]').click()")
+  await session.waitFor('settings for language change', "document.getElementById('settingsSheet').classList.contains('open')")
+  await session.evaluate("document.querySelector('#localeSeg button[data-locale=\"en\"]').click()")
+  await session.evaluate("document.getElementById('saveBtn').click()")
+  const localeSaved = await waitConfig((config) => config.locale === 'en', 'locale persisted as en')
+  report.localeSwitch = { persisted: localeSaved.locale }
+  try { session.ws.close() } catch { /* already gone */ }
+  session = null
+  if (child) child.kill()
+  await sleep(900)
+  child = null
+
+  session = await launch('localeRelaunch')
+  // The saved view is deck, so this also proves the reload kept the form.
+  await session.waitFor('english deck',
+    `document.documentElement.lang === 'en' && ${viewExpr('view-deck')} && document.getElementById('deckBalance').textContent.trim() === '145.09'`)
+  await sleep(350)
+  report.localeRelaunch = await session.evaluate(`({
+    lang: document.documentElement.lang,
+    pace: document.getElementById('gaugeCaption').textContent,
+    foot: document.getElementById('footMode').textContent,
+    cjk: [...document.body.innerText].filter((ch) => /[\\u4e00-\\u9fff]/.test(ch)).join('')
+  })`)
+  assert.equal(report.localeRelaunch.lang, 'en', 'the saved language must survive a restart')
+  assert.equal(report.localeRelaunch.pace, '30-day active pace')
+  assert.equal(report.localeRelaunch.foot, 'DEMO / sample data')
+  assert.equal(report.localeRelaunch.cjk, '', 'English mode must not show Chinese outside the language picker')
+  await quit()
+
   try {
     fs.rmSync(dataRoot, { recursive: true, force: true })
   } catch {

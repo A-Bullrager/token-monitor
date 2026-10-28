@@ -12,6 +12,54 @@ const AUTO_SETTINGS = QUERY.get('settings') === '1'
 const FORCE_DARK = QUERY.get('dark') === '1'
 const DAY = 24 * 60 * 60 * 1000
 
+const I18N = window.TmI18n
+// The main process resolves 'auto' against the system language and passes the
+// result in the URL, so the very first paint is already in the right language.
+const LOCALE = I18N && I18N.LOCALES.includes(QUERY.get('locale')) ? QUERY.get('locale') : 'zh'
+// Copy is authored in Chinese; English is derived, and Chinese stays untouched.
+const t = (text) => (I18N ? I18N.t(text, LOCALE) : text)
+function applyLanguage(root) {
+  if (I18N && LOCALE === 'en') I18N.applyTree(root || document.body, LOCALE)
+}
+// English mode translates text where it is written, so no render path has to
+// remember to translate. Translated output no longer matches the CJK test, so
+// the observer cannot feed on its own writes.
+function installLanguageMirror() {
+  if (!I18N || LOCALE !== 'en' || typeof MutationObserver === 'undefined') return
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      if (record.type === 'characterData') {
+        const next = I18N.t(record.target.nodeValue, LOCALE)
+        if (next !== record.target.nodeValue) record.target.nodeValue = next
+      } else if (record.type === 'childList') {
+        for (const added of record.addedNodes) {
+          if (added.nodeType === 1 || added.nodeType === 3) I18N.applyTree(added, LOCALE)
+        }
+      } else {
+        const value = record.target.getAttribute(record.attributeName)
+        if (!value) continue
+        const next = I18N.t(value, LOCALE)
+        if (next !== value) record.target.setAttribute(record.attributeName, next)
+      }
+    }
+  })
+  observer.observe(document.body, {
+    characterData: true,
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['title', 'aria-label', 'placeholder']
+  })
+}
+
+// Run before anything renders: the markup is authored in Chinese, so English
+// needs this pass to happen on the very first frame the user can see.
+if (I18N) {
+  I18N.setDocumentLocale(LOCALE)
+  applyLanguage(document.documentElement)
+  installLanguageMirror()
+}
+
 const $ = (id) => document.getElementById(id)
 
 const state = {
@@ -27,7 +75,7 @@ const state = {
   switching: false,
   loading: true,
   error: '',
-  version: '2.4.1',
+  version: '2.5.0',
   clearArmed: false,
   clearTimer: null,
   refreshTimer: null,
@@ -58,7 +106,7 @@ function cacheElements() {
     'deckRefresh', 'notice', 'noticeText', 'noticeAction', 'settingsSheet',
     'sheetScrim', 'sheetClose', 'apiKeyInput', 'apiKeyHint', 'sessionInput',
     'sessionHint', 'testBtn', 'helpBtn', 'helpBox', 'testResult',
-    'intervalSelect', 'demoSwitch', 'pinSwitch', 'themeSeg', 'versionText',
+    'intervalSelect', 'demoSwitch', 'pinSwitch', 'themeSeg', 'localeSeg', 'versionText',
     'usageLink', 'footerUsage', 'clearBtn', 'saveBtn', 'sheetError',
     'connApi', 'connSession', 'toast', 'deckScroll',
     'outlook30', 'outlook7', 'outlookDays30', 'outlookDays7', 'outlookForecast'
@@ -104,6 +152,11 @@ function plainMoney(value, digits = 2) {
 function formatTokens(value) {
   if (value == null || !Number.isFinite(Number(value))) return '—'
   const n = Number(value)
+  // 万 / 亿 are grouping units with no English wording, so English re-scales
+  // into compact notation instead of transliterating the Chinese grouping.
+  if (LOCALE === 'en' && n >= 1e4) {
+    return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+  }
   if (n >= 1e8) return `${(n / 1e8).toFixed(2)} 亿`
   if (n >= 1e4) return `${(n / 1e4).toFixed(n >= 1e6 ? 0 : 1)} 万`
   return Math.round(n).toLocaleString('en-US')
@@ -213,7 +266,8 @@ function setRunwayType(node, value, base, compact = false) {
 }
 
 function setText(node, value) {
-  if (node && node.textContent !== String(value)) node.textContent = String(value)
+  const text = t(String(value))
+  if (node && node.textContent !== text) node.textContent = text
 }
 
 /* ── derived data ──────────────────────────────────────────── */
@@ -279,6 +333,9 @@ function depletionDate(days) {
   const date = new Date()
   date.setHours(12, 0, 0, 0)
   date.setDate(date.getDate() + Math.round(value))
+  if (LOCALE === 'en') {
+    return `Runs out ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+  }
   return `约 ${date.getMonth() + 1} 月 ${date.getDate()} 日见底`
 }
 
@@ -1162,6 +1219,11 @@ function populateSettings() {
   for (const button of el.themeSeg.querySelectorAll('button')) {
     button.classList.toggle('active', button.dataset.theme === config.theme)
   }
+  // The language list is authored in Chinese and mirrored here; '中文' and
+  // 'English' stay in their own script on purpose, as language pickers do.
+  for (const button of el.localeSeg.querySelectorAll('button')) {
+    button.classList.toggle('active', button.dataset.locale === (config.locale || 'auto'))
+  }
 
   el.demoSwitch.setAttribute('aria-checked', String(config.demo))
   el.pinSwitch.setAttribute('aria-checked', String(config.alwaysOnTop))
@@ -1252,6 +1314,7 @@ function readDraft() {
     apiKey: el.apiKeyInput.value.trim(),
     sessionToken: el.sessionInput.value.trim(),
     theme: document.querySelector('#themeSeg button.active')?.dataset.theme || state.config.theme,
+    locale: document.querySelector('#localeSeg button.active')?.dataset.locale || state.config.locale || 'auto',
     intervalSec: Number(el.intervalSelect.value) || 60,
     alwaysOnTop: el.pinSwitch.getAttribute('aria-checked') !== 'false',
     demo: el.demoSwitch.getAttribute('aria-checked') !== 'false',
@@ -1271,8 +1334,10 @@ async function saveSettings() {
   el.saveBtn.textContent = '保存中…'
   el.sheetError.hidden = true
   try {
+    const previousLocale = state.config.locale || 'auto'
     const patch = {
       theme: draft.theme,
+      locale: draft.locale,
       intervalSec: draft.intervalSec,
       alwaysOnTop: draft.alwaysOnTop,
       demo: draft.demo,
@@ -1281,6 +1346,12 @@ async function saveSettings() {
     if (draft.apiKey) patch.apiKey = draft.apiKey
     if (draft.sessionToken) patch.sessionToken = draft.sessionToken
     state.config = await bridge.saveConfig(patch)
+    // A language change needs a fresh page: text already written into the DOM
+    // in the previous language can only come back translated from new markup.
+    if (draft.locale !== previousLocale) {
+      await bridge.reload()
+      return
+    }
     state.pace = state.config.paceMode || state.pace
     state.baseTheme = state.config.theme
     applyTheme(state.config.theme)
@@ -1589,6 +1660,16 @@ function bindEvents() {
     }
     applyTheme(theme)
     bridge.applyTheme?.(theme).catch(() => {})
+  })
+
+  // Unlike the theme, the language is not previewed: it takes a reload to
+  // rebuild every string, so it applies when the settings are saved.
+  el.localeSeg?.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-locale]')
+    if (!button) return
+    for (const node of el.localeSeg.querySelectorAll('button')) {
+      node.classList.toggle('active', node === button)
+    }
   })
 
   bridge.onViewChange?.((view) => {

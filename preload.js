@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('tm', {
   minimize: () => ipcRenderer.send('window:minimize'),
   close: () => ipcRenderer.send('window:close'),
   quit: () => ipcRenderer.send('app:quit'),
+  reload: () => ipcRenderer.invoke('app:reload'),
   openUsage: () => ipcRenderer.invoke('app:open-usage'),
   openExternal: (url) => ipcRenderer.invoke('app:open-external', url),
   ready: () => ipcRenderer.send('ui:ready'),

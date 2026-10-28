@@ -30,7 +30,7 @@
       <span class="caption-kicker">TOKEN MONITOR / RUNWAY INSTRUMENT</span>
       <h1>Know your runway.</h1>
       <p>把账户余额变成一条看得见的跑道。<br>DeepSeek 余额与用量的桌面仪器。</p>
-      <span class="caption-foot">30D ACTIVE PACE · LOCAL-FIRST · WINDOWS</span>
+      <span class="caption-foot">30D ACTIVE PACE · LOCAL-FIRST · CROSS-PLATFORM</span>
     </div>
 
     <main class="panel" id="panel" aria-label="Token Monitor">
@@ -326,6 +326,16 @@
               <button type="button" data-theme="system">跟随系统</button>
             </div>
             <p class="set-note">浅色是默认外观；深色适合夜间或深色桌面。</p>
+            <div class="field inline">
+              <span class="field-label"><span class="micro">LANGUAGE</span></span>
+              <!-- ASCII on purpose: the shipped MiSans subset has no 语言英文 glyphs,
+                   and a Chinese label here would silently depend on a system font. -->
+              <div class="seg" id="localeSeg" role="group" aria-label="LANGUAGE">
+                <button type="button" data-locale="auto">Auto</button>
+                <button type="button" data-locale="zh">Chinese</button>
+                <button type="button" data-locale="en">English</button>
+              </div>
+            </div>
           </section>
 
           <section class="set-section">
@@ -340,7 +350,7 @@
 
           <section class="set-section about">
             <h3>关于</h3>
-            <p class="set-note">Token Monitor <span id="versionText">v2.4.1</span> · 本地优先 · 非官方 DeepSeek 客户端。余额来自官方 API；用量来自平台会话接口，可能随平台调整。</p>
+            <p class="set-note">Token Monitor <span id="versionText">v2.5.0</span> · 本地优先 · 非官方 DeepSeek 客户端。余额来自官方 API；用量来自平台会话接口，可能随平台调整。</p>
             <p class="set-note credit">Fonts: Inter (SIL OFL 1.1) · MiSans (Xiaomi, royalty-free commercial license)</p>
             <div class="set-actions space">
               <button class="text-btn" type="button" id="footerUsage">平台用量页 ↗</button>
@@ -359,6 +369,7 @@
     </main>
   </div>
 
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

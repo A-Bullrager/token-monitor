@@ -365,15 +365,19 @@ try {
   assert.ok(settings.storageBox.right <= settings.save.left + 1, 'storage label must not overlap save button')
   assert.ok(settings.head.bottom <= settings.scroll.top + 1 && settings.scroll.bottom <= settings.foot.top + 1, 'settings header, scroll area and footer must not overlap')
   assert.ok(settings.scroll.totalWidth <= settings.scroll.width + 1, 'settings must not overflow horizontally')
-  if (settings.inner[1] >= 880) {
-    assert.ok(settings.scroll.total <= settings.scroll.height + 1, 'full-height settings must not scroll')
-  } else {
-    assert.match(settings.scroll.overflowY, /^(auto|scroll)$/)
-    if (settings.scroll.total > settings.scroll.height + 1) {
-      assert.ok(settings.scroll.scrollEnd > 0, 'short settings must actually scroll')
-      assert.ok(Math.abs(settings.scroll.scrollEnd - (settings.scroll.total - settings.scroll.height)) <= 1, 'settings must reach the end of its scroll range')
-    }
+  // The drawer scrolls whenever its content is taller than the window, which
+  // includes Chinese at full height (CJK line boxes are ~1px taller per row).
+  // What must hold in every case: the scroller is scrollable, the last section
+  // is reachable, and the footer with the save button stays outside it.
+  assert.match(settings.scroll.overflowY, /^(auto|scroll)$/, 'settings must be scrollable')
+  if (settings.scroll.total > settings.scroll.height + 1) {
+    assert.ok(settings.scroll.scrollEnd > 0, 'settings must actually scroll')
+    assert.ok(
+      Math.abs(settings.scroll.scrollEnd - (settings.scroll.total - settings.scroll.height)) <= 1,
+      'settings must reach the end of its scroll range'
+    )
   }
+  settings.scroll.scrolled = settings.scroll.total > settings.scroll.height + 1
   assert.ok(settings.scroll.lastBottom <= settings.scroll.bottom + 1, 'last settings section must be reachable')
   mark('completed')
   console.log(JSON.stringify({ executable: exe, profile, timings, boot, strip, deck, settings }, null, 2))

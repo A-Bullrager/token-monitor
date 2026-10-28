@@ -2,7 +2,7 @@
 
 把 **DeepSeek 余额与用量**放在桌面上的小仪表：日常缩成条带，需要时展开账本，用 `30D / 7D` 两种消费节奏估算「还能用多久」。
 
-**界面仅有中文，含部分英文标签，没有翻译版。** 基于 Electron 45、原生 DOM 与 SVG；无需中转服务器，不做遥测。
+**界面提供中文与英文。** 默认「自动」按系统语言选择：中文系统保持中文，其他语言给英文界面；设置里也可以固定选一种。基于 Electron 45、原生 DOM 与 SVG；无需中转服务器，不做遥测。[English documentation](README.en.md)
 
 ![展开后的账本](shots/deck.png)
 
@@ -137,9 +137,25 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 设置中凭证留空表示保留旧值；「清除凭证」会清空两项并切回演示模式。
 账户请求直接发往 `api.deepseek.com` / `platform.deepseek.com`；没有中转服务器或统计上报。图标、字体与演示数据均为本地资源。
 
+## 语言支持
+
+界面文案以中文撰写，英文由**主进程与渲染层共用的同一份词典**（`renderer/i18n.js`）推导，不存在两份各说各话的文案。
+
+| 中文界面 | 英文界面 |
+| --- | --- |
+| ![账本（中文）](shots/deck.png) | ![Ledger (English)](shots/deck-en.png) |
+
+- **翻什么**：两种形态、设置抽屉、快捷键表、通知与错误提示、托盘菜单与提示、macOS 应用菜单。
+- **不翻什么**：产品名、`DeepSeek`，以及语言选择器自身的选项名（刻意的，见下面的字体约束）。
+- **数字与日期随语言走**：中文用 `万 / 亿` 分组、见底写作 `约 3 月 5 日见底`；英文用紧凑记数（`12.5K`、`1.3M`）与 `Runs out Mar 5`。两者描述的是同一个量，检查按数值比较而不是字符串。
+- **刻意不变**：货币符号跟随账户、时钟保持 24 小时制、千分位仍按 `en-US` 分组。
+- 切换语言会保存设置并**重新加载窗口**——这是唯一会触发重载的选项，因为已经写进页面的文字无法就地再翻译一遍。
+
+**一个真实的字体约束**：随应用打包的 MiSans 子集是按固定语料裁剪的，里面**没有** 语 / 言 / 英 / 文 这四个字。重建子集要重新取得 MiSans 与 Inter 原始字体并加入裁剪步骤，还牵扯下文未解决的 MiSans 许可问题，因此本轮不重建；在新中文文案落回语料之前，语言行只能用 ASCII 的 `LANGUAGE` 与 `Auto / Chinese / English`，而不是 `语言 / 中文`。`npm run test:i18n` 会在任何可见字符越出语料时直接失败——这条检查曾经抓到真问题：等宽标签在 Linux runner 上显示方框，因为字体栈缺少随应用打包的中文回退。
+
 ## 测试与验证范围
 
-**本地验证（Windows 10 x64）：** 数据测试、21 组模拟存储后端断言、源码 UI、便携目录和实际 ZIP 解包启动均通过；9 个语言 / 时区场景、共 36 个界面状态通过，采集的字符均在语料内。另用 fontTools 检查现有语料的实际字体 cmap，未发现覆盖缺口。
+**本地验证（Windows 10 x64）：** 数据测试、21 组模拟存储后端断言、源码 UI、便携目录和实际 ZIP 解包启动均通过；11 个语言 / 时区场景、共 44 个界面状态通过，英文模式屏幕上的中文字符数为 0，采集字符均在语料内。另用 fontTools 检查现有语料的实际字体 cmap，未发现覆盖缺口。
 
 **云端第一轮（`9faa78e`，四个原生 runner）：** Windows x64 全绿；Linux x64 在 `ar-SA` 场景把「退出时调试连接先于回复关闭」误判为失败；两个 macOS 架构打包与严格验签成功，但发布物启动校验在首个 CDP 往返超时。
 
@@ -161,8 +177,8 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 | `npm run check:release` | 版本号一致性门禁：`package.json` / 锁文件 / 渲染层两处字面量必须同版本，标签必须等于 `v` + 版本 |
 | `npm run test:parse` | 数据解析、聚合、双节奏与边界情况，无需图形界面 |
 | `npm run test:store` | 21 组模拟系统后端断言：懒探测、pending 拒写、密文沿用与 `plain:` 升级；不代替真实密钥环验证 |
-| `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样 |
-| `npm run test:i18n` | 下述 Chromium 语言 / 时区与字体加载检查，不是翻译测试 |
+| `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样，以及切换英文后重载、再次启动仍为英文 |
+| `npm run test:i18n` | 下述 Chromium 语言 / 时区、界面语言解析、翻译完整性与字体检查 |
 | `npm run test:packaged` | `dist/` 目录版启动、字体、版本和形态还原 |
 | `npm run test:distributable` | 从 `release/` 的实际 ZIP / DMG / AppImage 解包并启动其中的可执行文件，不回退到 `dist/` |
 | `npm run render:live` | 运行取证与截图；`npm run shots` 更新展示截图 |
@@ -172,16 +188,17 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 ### 语言环境与字体检查
 
-`test:i18n` 共启动 **9 次**：
+`test:i18n` 共启动 **11 次**：
 
-- 请求七种 Chromium 语言：`zh-CN`、`en-US`、`ja-JP`、`de-DE`、`fr-FR`、`ko-KR`、`ar-SA`。后五种在本机实际规范化为 `ja / de / fr / ko / ar`，报告同时保留请求值和实际值。
+- 请求七种 Chromium 语言：`zh-CN`、`en-US`、`ja-JP`、`de-DE`、`fr-FR`、`ko-KR`、`ar-SA`。后五种在本机实际规范化为 `ja / de / fr / ko / ar`，报告同时保留请求值和实际值。每个场景还断言**应用解析出了哪种界面语言**（中文保持中文，其他一律英文），英文模式下要求屏幕上不残留任何中文、且词典没有报告未翻条目。
 - 另两次通过 CDP 模拟 Chromium 时区：`Pacific/Kiritimati`（UTC+14）与 `Pacific/Niue`（UTC−11），不改变宿主或主进程时区。
+- 再加两次手动覆盖：在 `zh-CN` 下强制英文、在 `en-US` 下强制中文，验证选择器能压过浏览器语言——这正是设置里那个选项做的事。
 - 每次使用独立、含中文与空格的 profile，检查配置落盘；遍历浅色条带、浅色账本、设置、深色账本四个状态。
-- 余额、跑道、今日花费、tokens 的固定演示数值文本与 `zh-CN` 基准比较；不要求时钟、日期与日期相关标签相同。
-- 检查 Inter / MiSans 的 FontFace 加载状态，采集的 DOM 字符是否属于 `scripts/font-corpus.txt` 语料；并通过 CDP `CSS.getPlatformFontsForNode` 读取「会话」标签实际命中的平台字体，确认它使用打包的 MiSans 子集（Windows 实测：修复前落到系统 NSimSun，Linux runner 上直接显示方框）。
+- 余额、跑道、今日花费与 `zh-CN` 基准逐字符串比较；tokens 因两种语言分组方式不同，改为按数值比较（相对误差 2% 内）；不要求时钟、日期与日期相关标签相同。
+- 检查 Inter / MiSans 的 FontFace 状态：中文模式下两者都必须已加载，英文模式下 MiSans 允许保持 `unloaded`（屏幕没有中文，浏览器按需加载本就不取它，这不是缺陷）；采集的 DOM 字符必须属于 `scripts/font-corpus.txt`；中文模式还通过 CDP `CSS.getPlatformFontsForNode` 读取「会话」标签实际命中的平台字体，确认它使用打包的 MiSans 子集（Windows 实测：修复前落到系统 NSimSun，Linux runner 上直接显示方框）。
 
 这些检查**不证明字体 cmap 完整覆盖、所有 fallback 字形、原生菜单、其他宿主 OS 语言版本或真实密钥加密**；语言测试本身不填写凭证，也不做加解密往返。
-界面数字分组固定 `en-US`、时钟为 `zh-CN` 24 小时制，保留中文大数单位；这不代表提供英文或其他语言 UI。
+界面数字分组固定 `en-US`、时钟为 24 小时制；中文用 `万 / 亿` 大数单位，英文改用紧凑记数，两者表示同一数量。这些检查仍不覆盖宿主操作系统的语言版本，也不覆盖原生菜单的实际渲染。
 
 ## GitHub Actions 与发布
 
@@ -230,7 +247,7 @@ GitHub 官方文档：[托管 runners](https://docs.github.com/en/actions/using-
 
 - `main.js` / `preload.js`：窗口、托盘、IPC 与最小化桥接。
 - `lib/deepseek.js` / `lib/store.js`：账户接口、指标聚合与配置存储。
-- `renderer/`：界面、样式、图表、本地字体；`scripts/`：启动、打包与回归。
+- `renderer/`：界面、样式、图表、本地字体与中英共用词典 `i18n.js`；`scripts/`：启动、打包与回归。
 - `shots/`：展示与运行截图；`dist/` 为目录版，`release/` 为可分发程序包。
 
 仅支持 DeepSeek，不做多平台聚合、多设备同步、自动登录、开机自启或自动更新。

@@ -16,6 +16,22 @@ const path = require('node:path')
 const store = require('./lib/store')
 const deepseek = require('./lib/deepseek')
 const { buildDemoState } = require('./lib/demo')
+const i18n = require('./renderer/i18n')
+
+// Effective UI language. The renderer needs it before its first paint, so it
+// travels in the window URL instead of waiting for an IPC round trip.
+let appLocale = 'zh'
+// --locale= lets the language checks force a UI language independently of the
+// Chromium --lang value, the same way --shot= drives screenshot mode.
+const LOCALE_ARG = process.argv.find((arg) => arg.startsWith('--locale='))
+const LOCALE_OVERRIDE = LOCALE_ARG ? LOCALE_ARG.split('=')[1] : ''
+function refreshLocale() {
+  const preferred = typeof app.getLocale === 'function' ? app.getLocale() : 'zh-CN'
+  appLocale = i18n.resolveLocale(LOCALE_OVERRIDE || store.get().locale, preferred)
+  return appLocale
+}
+// Copy written in Chinese; translated only when the UI language is English.
+const t = (text) => i18n.t(text, appLocale)
 
 app.setName('Token Monitor')
 if (process.platform === 'win32') app.setAppUserModelId('com.tokenmonitor.desktop')
@@ -242,21 +258,21 @@ function updateTrayMenu() {
   if (!tray) return
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: '展开账本', click: () => sendUiAction('deck') },
-      { label: '收起条带', click: () => sendUiAction('strip') },
+      { label: t('展开账本'), click: () => sendUiAction('deck') },
+      { label: t('收起条带'), click: () => sendUiAction('strip') },
       { type: 'separator' },
-      { label: '刷新账户', click: () => sendUiAction('refresh') },
-      { label: '设置…', click: () => sendUiAction('settings') },
+      { label: t('刷新账户'), click: () => sendUiAction('refresh') },
+      { label: t('设置…'), click: () => sendUiAction('settings') },
       { type: 'separator' },
       {
-        label: '显示 / 隐藏窗口',
+        label: t('显示 / 隐藏窗口'),
         click: () => {
           if (!mainWindow) return
           if (mainWindow.isVisible()) mainWindow.hide()
           else revealWindow()
         }
       },
-      { label: '退出 Token Monitor', click: () => app.quit() }
+      { label: t('退出 Token Monitor'), click: () => app.quit() }
     ])
   )
 }
@@ -266,8 +282,8 @@ function updateTrayTooltip(state) {
   const days = state?.usage?.daysLeft
   tray.setToolTip(
     Number.isFinite(Number(days)) && Number(days) > 0
-      ? `Token Monitor · 跑道 ${Number(days).toFixed(1)} 天`
-      : 'Token Monitor · DeepSeek 跑道'
+      ? t(`Token Monitor · 跑道 ${Number(days).toFixed(1)} 天`)
+      : t('Token Monitor · DeepSeek 跑道')
   )
 }
 
@@ -275,7 +291,7 @@ function createTray() {
   if (showcase || tray) return
   try {
     tray = new Tray(trayImage())
-    tray.setToolTip('Token Monitor · DeepSeek 跑道')
+    tray.setToolTip(t('Token Monitor · DeepSeek 跑道'))
     // macOS owns the click when a tray context menu is installed.
     if (process.platform !== 'darwin') {
       tray.on('click', () => {
@@ -304,7 +320,7 @@ function installApplicationMenu() {
     { role: 'appMenu' },
     { role: 'editMenu' },
     {
-      label: '视图',
+      label: t('视图'),
       submenu: [
         { role: 'toggleDevTools' },
         { type: 'separator' },
@@ -313,16 +329,29 @@ function installApplicationMenu() {
     },
     { role: 'windowMenu' },
     {
-      label: '帮助',
+      label: t('帮助'),
       submenu: [
         {
-          label: 'DeepSeek 平台用量页',
+          label: t('DeepSeek 平台用量页'),
           click: () => shell.openExternal('https://platform.deepseek.com/usage')
         }
       ]
     }
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+// One place builds the renderer query so a language change reloads with the
+// same window state it was created with.
+function rendererQuery() {
+  return {
+    showcase: showcase ? '1' : '0',
+    shot: IS_SHOT ? '1' : '0',
+    view: currentView,
+    dark: FORCE_DARK ? '1' : '0',
+    settings: SHOT_MODE === 'settings' ? '1' : '0',
+    locale: appLocale
+  }
 }
 
 function createWindow() {
@@ -356,13 +385,7 @@ function createWindow() {
     }
   })
 
-  const query = {
-    showcase: showcase ? '1' : '0',
-    shot: IS_SHOT ? '1' : '0',
-    view: currentView,
-    dark: FORCE_DARK ? '1' : '0',
-    settings: SHOT_MODE === 'settings' ? '1' : '0'
-  }
+  const query = rendererQuery()
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query })
 
   mainWindow.once('ready-to-show', () => {
@@ -525,6 +548,7 @@ function registerIpc() {
     return {
       version: app.getVersion(),
       platform: process.platform,
+      locale: appLocale,
       // null until the async probe answers; never probe here, or a pending
       // Keychain/DPAPI authorization would block the first paint.
       encryption: store.encryptionBackend(),
@@ -552,13 +576,21 @@ function registerIpc() {
       updateTrayTooltip(state)
       return { ok: true, state }
     } catch (error) {
-      return { ok: false, message: error?.message || '刷新失败' }
+      return { ok: false, message: error?.message || t('刷新失败') }
     }
   })
 
   ipcMain.handle('config:save', async (event, patch) => {
-    if (!trusted(event)) throw new Error('不受信任的请求')
+    if (!trusted(event)) throw new Error(t('不受信任的请求'))
     const view = await store.save(patch || {})
+    if (typeof patch?.locale === 'string') {
+      const before = appLocale
+      refreshLocale()
+      if (appLocale !== before) {
+        installApplicationMenu()
+        updateTrayMenu()
+      }
+    }
     if (typeof patch?.alwaysOnTop === 'boolean' && !showcase) {
       applyAlwaysOnTop(patch.alwaysOnTop)
     }
@@ -566,8 +598,18 @@ function registerIpc() {
     return view
   })
 
+  // A language change is applied by reloading: strings the renderer already
+  // built in the previous language can only come back translated from a fresh
+  // page, so the renderer asks for this once its save flow has settled.
+  ipcMain.handle('app:reload', (event) => {
+    if (!trusted(event)) throw new Error(t('不受信任的请求'))
+    if (showcase || IS_SHOT) return false
+    mainWindow?.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: rendererQuery() })
+    return true
+  })
+
   ipcMain.handle('config:test', async (event, payload = {}) => {
-    if (!trusted(event)) throw new Error('不受信任的请求')
+    if (!trusted(event)) throw new Error(t('不受信任的请求'))
     const stored = store.secrets()
     const apiKey = payload.apiKey?.trim() || stored.apiKey
     const sessionToken = payload.sessionToken?.trim() || stored.sessionToken
@@ -575,14 +617,14 @@ function registerIpc() {
   })
 
   ipcMain.handle('config:clear', async (event) => {
-    if (!trusted(event)) throw new Error('不受信任的请求')
+    if (!trusted(event)) throw new Error(t('不受信任的请求'))
     store.clearSecrets()
     await store.save({ demo: true })
     return store.publicView()
   })
 
   ipcMain.handle('window:set-view', async (event, next) => {
-    if (!trusted(event)) throw new Error('不受信任的请求')
+    if (!trusted(event)) throw new Error(t('不受信任的请求'))
     const view = next === 'deck' ? 'deck' : 'strip'
     if (showcase) {
       currentView = view
@@ -599,7 +641,7 @@ function registerIpc() {
   })
 
   ipcMain.handle('window:pin', async (event, pinned) => {
-    if (!trusted(event)) throw new Error('不受信任的请求')
+    if (!trusted(event)) throw new Error(t('不受信任的请求'))
     const next = Boolean(pinned)
     if (!showcase) applyAlwaysOnTop(next)
     await store.save({ alwaysOnTop: next })
@@ -607,8 +649,8 @@ function registerIpc() {
   })
 
   ipcMain.handle('theme:apply', (event, theme) => {
-    if (!trusted(event)) throw new Error('不受信任的请求')
-    if (!['light', 'dark', 'system'].includes(theme)) throw new Error('未知主题')
+    if (!trusted(event)) throw new Error(t('不受信任的请求'))
+    if (!['light', 'dark', 'system'].includes(theme)) throw new Error(t('未知主题'))
     if (!IS_SHOT) nativeTheme.themeSource = theme
     return theme
   })
@@ -642,6 +684,8 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    // Resolve before the menu and tray are built; they carry user-facing copy.
+    refreshLocale()
     installApplicationMenu()
     registerIpc()
     createWindow()
