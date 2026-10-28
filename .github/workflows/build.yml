@@ -104,6 +104,7 @@ jobs:
             shots/ui-report.json
             shots/i18n/*.json
             shots/i18n/*.png
+            shots/packaged/**
           if-no-files-found: ignore
           retention-days: 7
 

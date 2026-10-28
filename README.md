@@ -31,7 +31,7 @@
 ## 下载与运行
 
 发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
-**当前工作流刚编写，尚未提交或触发，暂无远程验证结果；以下是配置的发布目标，不代表已发布或已通过测试。**
+**首次云端运行（提交 `9faa78e`）：Windows x64 全绿；Linux x64 与两个 macOS 架构在测试阶段失败，Release 未创建，因此上表暂无可下载产物。** 修复已在本地验证，尚待下一次云端运行确认。
 
 | 平台 | 程序包 | 使用方式 |
 | --- | --- | --- |
@@ -133,7 +133,9 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 **本轮本地验证（Windows 10 x64）：** 数据测试、13 组模拟存储后端、源码 UI、便携目录和实际 ZIP 解包启动均通过；9 个语言 / 时区场景、共 36 个界面状态通过，采集的 257 个字符均在语料内。另用 fontTools 检查现有语料的实际字体 cmap，未发现覆盖缺口。
 
-Linux / macOS 尚无原生运行结果；工作流 YAML 和 electron-builder 配置已本地校验，CI 尚未触发。
+**首次云端运行（同一提交，四个原生 runner）：** Windows x64 的源码测试、打包与 ZIP 解包启动全部通过；Linux x64 在 `ar-SA` 场景请求退出时把「调试连接先于回复关闭」误判为失败（界面与数值检查此前已全部通过）；两个 macOS 架构打包与严格验签成功，但发布物启动校验的首个 CDP 往返超时，原因未定。
+
+**针对这三点的修复已在本地 Windows 验证，云端尚未复跑确认：** 退出竞态改为只放行该一种情况且仍要求进程以 0 退出（异常退出、超时、其他错误一律失败）；等宽标签补上随应用打包的 MiSans 回退，并用 CDP `CSS.getPlatformFontsForNode` 检查真实生效字体；发布物校验记录阶段与耗时，失败时在 CI 的 macOS 上抓取进程栈与签名权限。macOS 超时的根因仍未确定，放宽的只是冷启动等待。
 
 | 命令 | 检查范围 |
 | --- | --- |
@@ -157,14 +159,14 @@ Linux / macOS 尚无原生运行结果；工作流 YAML 和 electron-builder 配
 - 另两次通过 CDP 模拟 Chromium 时区：`Pacific/Kiritimati`（UTC+14）与 `Pacific/Niue`（UTC−11），不改变宿主或主进程时区。
 - 每次使用独立、含中文与空格的 profile，检查配置落盘；遍历浅色条带、浅色账本、设置、深色账本四个状态。
 - 余额、跑道、今日花费、tokens 的固定演示数值文本与 `zh-CN` 基准比较；不要求时钟、日期与日期相关标签相同。
-- 检查 Inter / MiSans 的 FontFace 加载状态，以及采集的 DOM 字符是否属于 `scripts/font-corpus.txt` 语料。
+- 检查 Inter / MiSans 的 FontFace 加载状态，采集的 DOM 字符是否属于 `scripts/font-corpus.txt` 语料；并通过 CDP `CSS.getPlatformFontsForNode` 读取「会话」标签实际命中的平台字体，确认它使用打包的 MiSans 子集（Windows 实测：修复前落到系统 NSimSun，Linux runner 上直接显示方框）。
 
 这些检查**不证明字体 cmap 完整覆盖、所有 fallback 字形、原生菜单、其他宿主 OS 语言版本或真实密钥加密**；语言测试本身不填写凭证，也不做加解密往返。
 界面数字分组固定 `en-US`、时钟为 `zh-CN` 24 小时制，保留中文大数单位；这不代表提供英文或其他语言 UI。
 
 ## GitHub Actions 与发布
 
-工作流见 [`.github/workflows/build.yml`](.github/workflows/build.yml)，以下描述的是配置行为，尚未经远程运行验证。
+工作流见 [`.github/workflows/build.yml`](.github/workflows/build.yml)。四个 runner 的行为已有首次真实运行记录（见「测试与验证范围」），Release 分支逻辑尚未跑到。
 本地 `git commit` 不会触发云端任务；需要 push、PR 或手动触发。GitHub Packages 面向 npm / 容器等包仓库，本项目的桌面程序使用 Artifacts 和 Release 附件分发。
 
 | 触发方式 | 行为 |
@@ -190,15 +192,16 @@ tag 带 `-`（如 `v2.4.0-beta.1`）会标为预发布；普通版本 tag 发布
 1. 在仓库设置中启用 Actions，并确认组织策略允许所用 runner、第三方 Actions 与发布权限。
 2. 工作流必须先存在于**默认分支**，Actions 页才可手动运行它；选择 **Build desktop apps → Run workflow**。
 3. 无需配置 PAT：Release job 已声明 `contents: write`，使用自带的 `GITHUB_TOKEN`；组织策略仍可能限制执行或授权。
-4. 用户明确确认后才提交 / 推送。当前代码与工作流尚未完成远程验证，不把本地修改当作已上线。
+4. 用户明确确认后才提交 / 推送。云端结果以实际运行为准，不把本地修改当作已上线。
 
-以下仅为日后示例，**本轮不执行**：先把版本（`package.json` 及锁文件）更新到目标版本并推送代码与工作流，确认目标 tag 在本地和远端均未使用。
-若目标版本为 `2.4.0`，才使用：
+**tag 建议单独推送。** 本仓库实测：`git push --atomic origin main refs/tags/v2.4.0` 只产生了 `main` 的一次运行，`v2.4.0` 没有对应的 tag 运行，Release 也没创建。官方文档只写明「一次推送超过三个 tag 不会创建事件」，并未定义分支与 tag 同推时的行为，所以这里把同推视为不可靠路径：先推代码，确认工作流已在默认分支，再单独推 tag。
 
 ```bash
-git tag v2.4.0 && git push origin v2.4.0
+git push origin main          # 第一步：让四个 runner 先在新提交上跑绿
+git push origin v2.4.1        # 第二步：单独推 tag，才会触发 Release 流程
 ```
 
+tag 必须等于 `v` + `package.json` 的 `version`，且四个 runner 全部成功；已有公开 Release 不会被覆盖。
 GitHub 官方文档：[托管 runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [触发事件](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows)。
 
 ## 项目结构与限制

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,7 +11,6 @@ const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf
 // Deliberately hostile: spaces and non-ASCII in the profile path.
 const profile = oddTempProfile('token-monitor-packaged-')
 const profileRoot = path.dirname(profile)
-const port = 9600 + Math.floor(Math.random() * 200)
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const env = { ...process.env }
 delete env.ELECTRON_RUN_AS_NODE
@@ -21,6 +20,60 @@ let childClosed = null
 let ws = null
 let evaluate = null
 let stderr = ''
+let stdout = ''
+let phase = 'launch'
+let lastCommand = null
+let port = null
+let page = null
+let exit = null
+const startedAt = Date.now()
+const timings = {}
+
+function mark(name) {
+  timings[name] = Date.now() - startedAt
+}
+
+function saveFailureDiagnostics(error) {
+  mark('failed')
+  const dir = path.join(root, 'shots', 'packaged', `${Date.now()}-${process.platform}-${process.arch}`)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'failure.json'), JSON.stringify({
+    phase, lastCommand, executable: exe, profile, port, page, pid: child?.pid,
+    exit, timings, error: error?.stack || String(error), stdout, stderr
+  }, null, 2))
+  // Native CI evidence only: never sample unrelated desktop processes or
+  // change Keychain, sandbox, Gatekeeper, GPU flags or signing permissions.
+  if (process.platform === 'darwin' && process.env.CI === 'true') {
+    const record = (name, command, args, timeout = 5000) => {
+      const result = spawnSync(command, args, { encoding: 'utf8', timeout, maxBuffer: 2 * 1024 * 1024 })
+      fs.writeFileSync(path.join(dir, name), JSON.stringify({
+        command, args, status: result.status, signal: result.signal,
+        error: result.error?.message, stdout: result.stdout, stderr: result.stderr
+      }, null, 2))
+    }
+    if (child?.pid && !exit) {
+      const pids = [child.pid]
+      for (let i = 0; i < pids.length && pids.length < 8; i++) {
+        const result = spawnSync('/usr/bin/pgrep', ['-P', String(pids[i])], { encoding: 'utf8', timeout: 2000 })
+        for (const line of (result.stdout || '').trim().split(/\s+/)) {
+          const pid = Number(line)
+          if (Number.isInteger(pid) && pid > 0 && !pids.includes(pid) && pids.length < 8) pids.push(pid)
+        }
+      }
+      for (const pid of pids) {
+        record(`sample-${pid}.json`, '/usr/bin/sample', [String(pid), '1', '10', '-file', path.join(dir, `sample-${pid}.txt`)])
+      }
+    }
+    record('main-entitlements.json', '/usr/bin/codesign', ['--display', '--entitlements', ':-', exe])
+    const frameworks = path.resolve(path.dirname(exe), '..', 'Frameworks')
+    if (fs.existsSync(frameworks)) {
+      for (const bundle of fs.readdirSync(frameworks).filter(name => name.endsWith('.app')).slice(0, 8)) {
+        record(`${bundle}-entitlements.json`, '/usr/bin/codesign', ['--display', '--entitlements', ':-', path.join(frameworks, bundle)])
+      }
+    }
+  }
+  console.error(`Packaged failure diagnostics: ${dir}`)
+}
 
 async function waitForChildClose(timeout) {
   if (!childClosed) return true
@@ -34,42 +87,55 @@ async function waitForChildClose(timeout) {
 }
 
 try {
-  child = spawn(exe, [`--remote-debugging-port=${port}`, `--user-data-dir=${profile}`], {
+  // Bind to the debugger URL emitted by this child, not a random fixed port
+  // that might belong to a previous application or another test.
+  child = spawn(exe, ['--remote-debugging-port=0', `--user-data-dir=${profile}`], {
     cwd: root,
     env,
     stdio: ['ignore', 'pipe', 'pipe']
   })
   let spawnError = null
   let closed = false
-  childClosed = new Promise((resolve) => child.once('close', () => {
+  childClosed = new Promise((resolve) => child.once('close', (code, signal) => {
     closed = true
+    exit = { code, signal }
     resolve()
   }))
   child.on('error', (error) => { spawnError = error })
-  child.stdout.resume()
+  child.stdout.on('data', (chunk) => { stdout = (stdout + String(chunk)).slice(-12000) })
   child.stderr.on('data', (chunk) => {
     stderr = (stderr + String(chunk)).slice(-12000)
+    port ??= stderr.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1] || null
   })
 
-  const deadline = Date.now() + 25000
-  let page = null
+  // Cold-start budget: a freshly built, ad-hoc-signed macOS bundle can take far
+  // longer to expose and answer its first CDP round trip than the source run.
+  // This only widens startup waits; every assertion below stays unchanged.
+  const coldStart = process.env.CI === 'true' && process.platform === 'darwin' ? 90000 : 25000
+  const callBudget = process.env.CI === 'true' && process.platform === 'darwin' ? 90000 : 20000
+  phase = 'discover-child-page'
+  const deadline = Date.now() + coldStart
   while (Date.now() < deadline && !page) {
     if (spawnError) throw spawnError
     if (closed) throw new Error(`packaged app exited before CDP was ready\n${stderr}`)
-    try {
-      const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
-      page = targets.find((item) => item.type === 'page' && item.url.includes('renderer/index.html'))
-    } catch {
-      /* not ready */
+    if (port) {
+      try {
+        const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(1000) })).json()
+        page = targets.find((item) => item.type === 'page' && item.url.includes('renderer/index.html'))
+      } catch {
+        /* not ready */
+      }
     }
     if (!page) await sleep(300)
   }
   if (!page) throw new Error(`packaged app did not expose a page\n${stderr}`)
 
+  phase = 'connect-child-page'
   ws = new WebSocket(page.webSocketDebuggerUrl)
   await new Promise((resolve, reject) => {
-    ws.addEventListener('open', resolve, { once: true })
-    ws.addEventListener('error', reject, { once: true })
+    const timer = setTimeout(() => reject(new Error('packaged CDP connection timeout')), 10000)
+    ws.addEventListener('open', () => { clearTimeout(timer); resolve() }, { once: true })
+    ws.addEventListener('error', () => { clearTimeout(timer); reject(new Error('packaged CDP connection error')) }, { once: true })
   })
   let nextId = 1
   const pending = new Map()
@@ -89,41 +155,53 @@ try {
     }
     pending.clear()
   })
-  const call = (method, params = {}) =>
+  const call = (method, params = {}, timeout = 20000) =>
     new Promise((resolve, reject) => {
+      if (ws.readyState !== WebSocket.OPEN) return reject(new Error('packaged CDP is not open'))
       const id = nextId++
+      const command = { phase, method, expression: params.expression?.slice(0, 500), startedAt: new Date().toISOString(), timeout }
+      lastCommand = command
       const timer = setTimeout(() => {
         pending.delete(id)
-        reject(new Error(`CDP timeout: ${method}`))
-      }, 20000)
+        reject(new Error(`CDP timeout: ${JSON.stringify(command)}`))
+      }, timeout)
       pending.set(id, { resolve, reject, timer })
       ws.send(JSON.stringify({ id, method, params }))
     })
-  evaluate = async (expression) => {
+  evaluate = async (expression, timeout) => {
     const result = await call('Runtime.evaluate', {
       expression,
       awaitPromise: true,
       returnByValue: true,
       userGesture: true
-    })
+    }, timeout)
     if (result.exceptionDetails) {
       throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text)
     }
     return result.result?.value
   }
-  const waitFor = async (expression, timeout = 20000) => {
+  const waitFor = async (expression, timeout = 20000, perCall = 20000) => {
     const end = Date.now() + timeout
     while (Date.now() < end) {
-      if (await evaluate(expression)) return
+      if (await evaluate(expression, perCall)) return
       await sleep(200)
     }
     throw new Error(`packaged wait timeout: ${expression}`)
   }
 
-  await call('Runtime.enable')
-  await waitFor("document.getElementById('stripBalance')?.textContent?.trim() === '¥145.09'")
-  await evaluate('document.fonts.ready.then(() => true)')
-  const boot = await evaluate('window.tm.bootstrap()')
+  mark('connected')
+  phase = 'enable-runtime'
+  await call('Runtime.enable', {}, callBudget)
+  mark('runtime-enabled')
+  phase = 'first-demo-render'
+  await waitFor("document.getElementById('stripBalance')?.textContent?.trim() === '¥145.09'", coldStart, callBudget)
+  mark('first-demo-render')
+  phase = 'font-readiness'
+  await evaluate('document.fonts.ready.then(() => true)', callBudget)
+  mark('fonts-ready')
+  phase = 'bootstrap-ipc'
+  const boot = await evaluate('window.tm.bootstrap()', callBudget)
+  mark('bootstrap')
   assert.equal(boot.isPackaged, true, 'must launch the packaged application')
   assert.equal(boot.version, version, 'packaged version must match package.json')
   assert.equal(boot.platform, process.platform)
@@ -143,6 +221,7 @@ try {
   }
   assert.ok(platformBackends[process.platform]?.includes(boot.encryption), `unexpected backend: ${boot.encryption}`)
 
+  phase = 'strip-assertions'
   const strip = await evaluate(`({
     view: document.body.className,
     inner: [window.innerWidth, window.innerHeight],
@@ -168,6 +247,7 @@ try {
   assert.equal(strip.scene, 'none', 'stage wallpaper must stay hidden outside showcase')
   assert.ok(strip.fonts.inter && strip.fonts.misans, 'bundled fonts must load')
 
+  phase = 'deck-transition-and-assertions'
   await evaluate("document.querySelector('.strip-main').click()")
   await waitFor("document.body.classList.contains('view-deck') && !document.body.classList.contains('morphing')")
   const deck = await evaluate(`({
@@ -197,6 +277,7 @@ try {
   assert.equal(deck.ringKnob, 1)
   assert.ok(deck.inner[0] > 0 && deck.inner[0] <= 576, 'deck width must respect fitSize')
 
+  phase = 'settings-geometry-and-assertions'
   await evaluate("document.querySelector('.deck-head [data-action=\"settings\"]').click()")
   await waitFor("document.getElementById('settingsSheet').classList.contains('open')")
   await sleep(400) // Let the 340 ms drawer transition finish before geometry checks.
@@ -277,12 +358,19 @@ try {
     }
   }
   assert.ok(settings.scroll.lastBottom <= settings.scroll.bottom + 1, 'last settings section must be reachable')
-  console.log(JSON.stringify({ executable: exe, profile, boot, strip, deck, settings }, null, 2))
+  mark('completed')
+  console.log(JSON.stringify({ executable: exe, profile, timings, boot, strip, deck, settings }, null, 2))
 } catch (error) {
   console.error(error?.stack || String(error))
   if (stderr) console.error(stderr.slice(-4000))
   process.exitCode = 1
+  try {
+    saveFailureDiagnostics(error)
+  } catch (diagnosticError) {
+    console.error(`Could not save failure diagnostics: ${diagnosticError.message}`)
+  }
 } finally {
+  phase = 'cleanup'
   try {
     if (evaluate && ws?.readyState === WebSocket.OPEN) {
       try {

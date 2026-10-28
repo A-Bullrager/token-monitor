@@ -42,7 +42,7 @@
   --stage-caption: #ffffff;
   --stage-muted: rgba(255, 255, 255, 0.72);
   --serif: var(--sans);
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, "MiSans", monospace;
   --sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
     "Segoe UI", "MiSans", "PingFang SC", "Microsoft YaHei UI", sans-serif;
   --switch-on: #34c759;

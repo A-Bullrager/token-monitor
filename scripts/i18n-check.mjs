@@ -6,9 +6,9 @@
 // settings/light and deck/dark. Only fixed demo numeric strings are compared
 // with zh-CN; clocks, dates and date-dependent labels are not equality probes.
 //
-// FontFace loading and DOM character membership in font-corpus.txt are checked.
-// This is NOT an actual font cmap inspection, per-glyph fallback verification,
-// native menu rendering test, or encryption / DPAPI round-trip test.
+// FontFace loading, DOM corpus membership and a representative monospace CJK
+// label's actual platform font are checked. This is NOT a full font cmap or
+// per-glyph fallback audit, native menu test, or encryption round-trip test.
 // Usage: node scripts/i18n-check.mjs [--keep-shots]
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -276,6 +276,27 @@ async function runScenario(scenario) {
       await shoot(`${scenario.name}-${state}.png`)
       validateState(scenario, state, data)
     }
+    const verifyMonoCjk = async () => {
+      const families = await evaluate(`({
+        label: getComputedStyle(document.getElementById('connSession')).fontFamily,
+        select: getComputedStyle(document.getElementById('intervalSelect')).fontFamily,
+        placeholder: getComputedStyle(document.getElementById('sessionInput'), '::placeholder').fontFamily
+      })`)
+      for (const [element, family] of Object.entries(families)) {
+        assert(family.includes('MiSans'), `${scenario.name}: ${element} needs bundled CJK font fallback: ${family}`)
+      }
+      // FontFaceSet.check does not prove that a label actually uses the font.
+      // Inspect a real Chinese label, without changing the DOM or installing
+      // system CJK fonts that could hide a missing application fallback.
+      await call('DOM.enable')
+      await call('CSS.enable')
+      const { root: documentNode } = await call('DOM.getDocument')
+      const { nodeId } = await call('DOM.querySelector', { nodeId: documentNode.nodeId, selector: '#connSession' })
+      const { fonts } = await call('CSS.getPlatformFontsForNode', { nodeId })
+      entry.monospaceCjk = { families, fonts }
+      assert(fonts.some(font => font.isCustomFont && /MiSans/i.test(font.familyName) && font.glyphCount >= 2),
+        `${scenario.name}: Chinese status label did not use bundled MiSans: ${JSON.stringify(fonts)}`)
+    }
     const verifyConfig = async (theme) => {
       assert(fs.existsSync(entry.configFile), `${scenario.name}: config.json was not written in its CJK profile`)
       const disk = JSON.parse(fs.readFileSync(entry.configFile, 'utf8'))
@@ -329,6 +350,7 @@ async function runScenario(scenario) {
     await waitFor("document.getElementById('settingsSheet').classList.contains('open')", 'settings open')
     await sleep(400) // Allow the settings sheet transition to finish for capture.
     await capture('settings')
+    await verifyMonoCjk()
 
     await evaluate("document.querySelector('#themeSeg [data-theme=\"dark\"]').click()")
     await evaluate("document.getElementById('saveBtn').click()")
@@ -338,9 +360,18 @@ async function runScenario(scenario) {
     await verifyConfig('dark')
     entry.numericComparison = scenario.name === 'zh' ? 'zh-CN baseline' : 'matches zh-CN in all four states'
     entry.title = await evaluate('document.title') // Report only; native surfaces are not tested.
-    await evaluate('window.tm.quit()')
+    let quitDisconnected = false
+    try {
+      await evaluate('window.tm.quit()')
+    } catch (error) {
+      // app.quit() can close CDP before Runtime.evaluate replies. Only accept
+      // this exact shutdown race; earlier disconnects and other errors fail.
+      if (error?.message !== 'CDP connection closed') throw error
+      quitDisconnected = true
+    }
     const exit = await withTimeout(closed, 10000, 'Electron shutdown')
-    assert(exit.code === 0, `${scenario.name}: Electron exited with ${JSON.stringify(exit)}`)
+    entry.shutdown = { ...exit, quitDisconnected }
+    assert(exit.code === 0 && exit.signal == null, `${scenario.name}: Electron exited with ${JSON.stringify(exit)}`)
   } catch (error) {
     entry.error = error?.stack || String(error)
     if (shoot && ws?.readyState === WebSocket.OPEN) {
@@ -364,7 +395,7 @@ async function runScenario(scenario) {
 const summary = {
   scope: 'Chinese UI under Chromium language environments; not translated UI or host OS language editions',
   timezoneScope: 'CDP Chromium timezone emulation only; host OS and main process timezone unchanged',
-  fontScope: 'FontFace loading and corpus character membership only; no cmap or exhaustive fallback verification',
+  fontScope: 'FontFace loading, corpus membership and a representative monospace CJK label actual platform font; no exhaustive cmap/fallback audit',
   encryptionScope: 'bootstrap platform/encryption are reported only; no credential or encryption round-trip tests',
   numericProbes: NUMERIC_PROBES,
   profileParent,
