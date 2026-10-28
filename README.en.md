@@ -176,7 +176,7 @@ The UI is authored in Chinese; English is derived from a single dictionary share
 | `npm run check:release` | Version gate: `package.json`, lockfile and the two renderer literals must agree, and a tag must equal `v` + version |
 | `npm run test:parse` | Parsing, aggregation, both paces and edge cases; no GUI needed |
 | `npm run test:store` | 21 assertions over mocked system backends: lazy probe, refusal while pending, ciphertext retention and `plain:` upgrade; not a real keyring |
-| `npm run test:ui` | Forms, themes, privacy, settings, credential branches and clearing, restart restore, morph sampling, and the language switch with a restart |
+| `npm run test:ui` | Forms, themes, privacy, settings, credential branches and clearing, restart restore, morph sampling, and the language switch followed by a restart that must still be English. Every phase except the last pins Chinese, because the assertions are written for one language and the host language is not ours to assume (the first version of this failed on all four runners, whose hosts answer in English) |
 | `npm run test:i18n` | The Chromium language / timezone and font checks described below |
 | `npm run test:packaged` | Directory build: launch, fonts, version and form restore |
 | `npm run test:distributable` | Extracts the real ZIP / DMG / AppImage from `release/` and launches the executable inside it; never falls back to `dist/` |

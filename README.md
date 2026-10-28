@@ -177,7 +177,7 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 | `npm run check:release` | 版本号一致性门禁：`package.json` / 锁文件 / 渲染层两处字面量必须同版本，标签必须等于 `v` + 版本 |
 | `npm run test:parse` | 数据解析、聚合、双节奏与边界情况，无需图形界面 |
 | `npm run test:store` | 21 组模拟系统后端断言：懒探测、pending 拒写、密文沿用与 `plain:` 升级；不代替真实密钥环验证 |
-| `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样，以及切换英文后重载、再次启动仍为英文 |
+| `npm run test:ui` | 形态、主题、隐私、设置、凭证存储分支与清除、重启还原、形变采样，以及切换英文后重载、再次启动仍为英文。除最后一步外都显式固定中文，否则宿主语言一变断言就跟着漂（CI runner 的宿主语言是英语，第一版就在这里全线失败） |
 | `npm run test:i18n` | 下述 Chromium 语言 / 时区、界面语言解析、翻译完整性与字体检查 |
 | `npm run test:packaged` | `dist/` 目录版启动、字体、版本和形态还原 |
 | `npm run test:distributable` | 从 `release/` 的实际 ZIP / DMG / AppImage 解包并启动其中的可执行文件，不回退到 `dist/` |

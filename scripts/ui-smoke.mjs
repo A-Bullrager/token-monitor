@@ -48,11 +48,20 @@ async function waitConfig(predicate, label, timeout = 6000) {
   throw new Error(`config wait failed: ${label}`)
 }
 
-async function launch(label) {
+async function launch(label, { locale = 'zh' } = {}) {
   report[label] = {}
   child = spawn(
     electronBinary,
-    [...(usePackaged ? [] : [root]), `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`],
+    [
+      ...(usePackaged ? [] : [root]),
+      `--remote-debugging-port=${port}`,
+      `--user-data-dir=${profileDir}`,
+      // The suite asserts Chinese copy, so it pins the language instead of
+      // trusting the host: CI runners answer in English and would otherwise
+      // change the interface under the test. Pass locale: null to leave the
+      // app to its own saved setting.
+      ...(locale ? [`--locale=${locale}`] : [])
+    ],
     {
       cwd: root,
       env,
@@ -585,7 +594,8 @@ try {
   await sleep(900)
   child = null
 
-  session = await launch('localeRelaunch')
+  // No override here: the app must reach English from its own saved setting.
+  session = await launch('localeRelaunch', { locale: null })
   // The saved view is deck, so this also proves the reload kept the form.
   await session.waitFor('english deck',
     `document.documentElement.lang === 'en' && ${viewExpr('view-deck')} && document.getElementById('deckBalance').textContent.trim() === '145.09'`)

@@ -89,7 +89,10 @@ async function waitForChildClose(timeout) {
 try {
   // Bind to the debugger URL emitted by this child, not a random fixed port
   // that might belong to a previous application or another test.
-  child = spawn(exe, ['--remote-debugging-port=0', `--user-data-dir=${profile}`], {
+  // This check asserts the Chinese copy (shortcuts, storage note, mix line),
+  // so it pins the language rather than trusting the host: CI runners answer in
+  // English. Language resolution itself is scripts/i18n-check.mjs' job.
+  child = spawn(exe, ['--remote-debugging-port=0', `--user-data-dir=${profile}`, '--locale=zh'], {
     cwd: root,
     env,
     stdio: ['ignore', 'pipe', 'pipe']
