@@ -96,7 +96,7 @@ const state = {
   switching: false,
   loading: true,
   error: '',
-  version: '2.6.1',
+  version: '2.6.2',
   clearArmed: false,
   clearTimer: null,
   refreshTimer: null,
@@ -338,8 +338,23 @@ function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
     }
     return window.innerWidth
   }
-  const overflows = () => node.scrollWidth > node.clientWidth + 1 ||
-    node.getBoundingClientRect().right > limit() + 1
+  const overflows = () => node.scrollWidth > node.clientWidth + 1 || inkRight() > limit() + 1
+  // The right edge of the *ink*, not of the box. These slots sit in flex rows that
+  // can be wider than the text they hold — on the Spanish deck a 226px box carried
+  // about 113px of glyphs — and a box that overhangs the clipping panel by a few
+  // pixels shows the reader nothing. Measuring the box made an unwinnable test: the
+  // fitter shrank the number toward its floor trying to move an edge that font size
+  // cannot move, and the card ended up printing the headline balance at 16.5px
+  // where it had fitted comfortably at 33px.
+  const inkRight = () => {
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    const rects = range.getClientRects()
+    if (!rects.length) return node.getBoundingClientRect().right
+    let right = 0
+    for (const rect of rects) right = Math.max(right, rect.right)
+    return right
+  }
   let scale = 1
   for (let step = 0; step < steps && overflows(); step++) {
     scale = Math.max(floor, scale - 0.12)
