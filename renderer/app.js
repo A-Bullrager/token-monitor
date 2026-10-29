@@ -77,7 +77,7 @@ const state = {
   switching: false,
   loading: true,
   error: '',
-  version: '2.6.0',
+  version: '2.6.1',
   clearArmed: false,
   clearTimer: null,
   refreshTimer: null,
@@ -263,6 +263,38 @@ function setRunwayType(node, value, base, compact = false) {
     node.style.fontSize = text.length > 5 ? '29px' : text.length > 4 ? '35px' : ''
   } else {
     node.style.fontSize = text.length > 5 ? '44px' : text.length > 4 ? '50px' : ''
+  }
+}
+
+// A money slot laid out for ¥1.49 also has to survive ¥9,999,999.99, which is
+// three times the width. Rather than clip it or reflow the fixed instrument,
+// shrink the type until the text measurably fits — measured against the box
+// that actually clips it, so it works for every language and every digit
+// count — and stop at a floor below which the number stops being readable.
+function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
+  if (!node) return
+  node.style.fontSize = ''
+  const base = parseFloat(getComputedStyle(node).fontSize)
+  if (!Number.isFinite(base)) return
+  // The box that actually clips this text. A flex item usually grows with its
+  // own content, so comparing the element to itself would never notice: the
+  // overflow shows up as the element running past the nearest ancestor that is
+  // allowed to clip it.
+  const limit = () => {
+    for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+      const style = getComputedStyle(parent)
+      if (style.overflowX === 'visible' && style.textOverflow !== 'ellipsis') continue
+      return parent.getBoundingClientRect().right - (parseFloat(style.paddingRight) || 0)
+    }
+    return window.innerWidth
+  }
+  const overflows = () => node.scrollWidth > node.clientWidth + 1 ||
+    node.getBoundingClientRect().right > limit() + 1
+  let scale = 1
+  for (let step = 0; step < steps && overflows(); step++) {
+    scale = Math.max(floor, scale - 0.12)
+    node.style.fontSize = `${+(base * scale).toFixed(2)}px`
+    if (scale === floor) break
   }
 }
 
@@ -554,6 +586,7 @@ function renderStrip() {
   }
 
   el.stripBalance.textContent = b ? money(b.total) : money(null)
+  fitNumber(el.stripBalance)
   el.stripPace.textContent =
     pace.avg == null ? '— / 天' : `${money(pace.avg)} / 天`
 
@@ -569,7 +602,10 @@ function renderStrip() {
     el.stripGauge.classList.add(`state-${runwayState(needleVisible ? pace.runway : null)}`)
   }
 
-  el.stripToday.textContent = u ? money(u.today?.cost) : money(null)
+  // Translated first, then fitted: the language mirror would otherwise rewrite
+  // the text after the measurement and a longer language would overflow again.
+  setText(el.stripToday, u ? money(u.today?.cost) : money(null))
+  fitNumber(el.stripToday)
   el.stripTokens.textContent = u ? `${formatTokens(u.today?.tokens)} TOKENS` : '— TOKENS'
   renderSparkline(u?.series || [])
 
@@ -731,9 +767,11 @@ function renderDeck() {
   if (el.currency) el.currency.textContent = currencySymbol()
   el.ledgerMoney?.classList.toggle('is-empty', !b)
   el.deckBalance.textContent = b ? plainMoney(b.total) : '—'
-  el.deckBalanceSub.textContent = b
+  fitNumber(el.deckBalance)
+  setText(el.deckBalanceSub, b
     ? `充值 ${money(b.topup)} · 赠金 ${money(b.grant)}`
-    : '尚未读取到余额'
+    : '尚未读取到余额')
+  fitNumber(el.deckBalanceSub)
 
   el.deckToday.textContent = u ? money(u.today?.cost) : money(null)
   el.deckTodayTokens.textContent = u ? `${formatTokens(u.today?.tokens)} tokens` : '—'

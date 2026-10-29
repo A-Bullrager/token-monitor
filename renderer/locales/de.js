@@ -46,7 +46,7 @@
 '部分连接 · 余额待补充': 'Teilweise · Guthaben fehlt',
 '等待连接': 'Warten auf Verbindung',
 '需要用量数据': 'Verbrauchsdaten fehlen',
-'样本偏少 · 仅供参考': 'Wenig Stichproben · Richtwert',
+'样本偏少 · 仅供参考': 'Stichprobe · Richtwert',
 '— / 天': '— / Tag',
 '按 30 天活跃日': 'Rhythmus 30 Aktivtage',
 '按 7 天自然日': 'Rhythmus aus 7 Kalendertagen',

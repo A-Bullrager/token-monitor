@@ -44,7 +44,7 @@
 '部分连接 · 余额待补充': 'Parcial · falta saldo',
 '等待连接': 'Esperando conexión',
 '需要用量数据': 'Faltan datos de uso',
-'样本偏少 · 仅供参考': 'Muestra escasa · orientativo',
+'样本偏少 · 仅供参考': 'Muestra · orientativa',
 '— / 天': '— / día',
 '按 30 天活跃日': 'Ritmo activo de 30 días',
 '按 7 天自然日': 'Ritmo de 7 días naturales',

@@ -176,7 +176,7 @@ The interface is authored in Chinese, and every other language is a dictionary k
 - **Shipped languages**: Chinese (the authored language), English, Spanish, Brazilian Portuguese and German. `Auto` matches the system language by prefix — `zh*`, `es*`, `pt*`, `de*`, `en*` — and everything else lands on English, the one fallback every bundled font can render. `pt-PT` therefore gets the Brazilian dictionary; `es-MX` and `es-ES` share one Spanish.
 - **What is translated**: both window forms, the settings drawer, shortcut list, notices, error messages, tray menu, tray tooltip and the macOS application menu — plus the ASCII instrument chrome (`DAYS`, `TOTAL`, `SAMPLE`, `AVG`, `PEAK ¥29.10 · 10-03`, `SYNCED 18:02:18`), which Chinese mode shows in English too.
 - **What is not translated**: the product name, the `Know your runway.` tagline, `DeepSeek`, `API KEY` / `SESSION TOKEN` as field names, and the instrument codes `DEMO`, `SYNC`, `30D / 7D` and the `M` / `K` magnitude units.
-- **Number and date formats follow the language**: Chinese groups token counts with 万 / 亿 and writes depletion as `约 3 月 5 日见底`; English uses `12.5K` and `Runs out Mar 5`; Spanish `12,5 mil` and `Se agota 5 mar`; Portuguese `12,5 mil` and `Acaba 5 de mar.`; German `12.500` and `Am 5. März leer`. The quantities behind them are identical, and the checks compare them numerically.
+- **Number and date formats follow the language**: Chinese groups token counts with 万 / 亿 and writes depletion as `约 3 月 5 日见底`; English uses `12.5K` and `Runs out Mar 5`; Spanish `12,5 mil` and `Se agota 5 mar`; Portuguese `12,5 mil` and `Acaba 5 de mar.`; German `12.500` and `Am 5. März leer`. The quantities behind them are identical, and the checks compare them numerically. A number too long for its slot — ¥99,999,999.99 in a column laid out for ¥1.49 — shrinks its own type until it fits instead of being cut off.
 - **Plurals belong to the language**: Chinese marks no grammatical number, so each dictionary inflects its own counted noun (`1 día activo` / `15 días activos`, `1 Tag` / `15 Tage`). The parity check refuses a locale whose one-form and many-form come out the same, and treats a measured `1.0` as plural.
 - **Known limit**: money keeps one dot-decimal style in every language (`¥145.09`), and so does the clock. Only token counts follow the language's own grouping. Switching the language saves the setting and **reloads the window** — the only setting that does, because text already written into the page cannot be retranslated in place.
 
@@ -184,12 +184,12 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 ## Tests and what they prove
 
-**Local (Windows 10 x64)**: data tests, 22 mocked storage-backend assertion groups, dictionary parity, glyph demand, source UI, directory build and a real ZIP extraction and launch all pass; 16 language scenarios × 4 interface states pass, every collected character is inside the corpus, and no label is clipped in any shipped language. fontTools was used against the actual subset cmaps — every Latin character the dictionaries can put on screen is in the Inter subset, and every Chinese character in the demand set is in one of the two bundles.
+16 language scenarios × 4 interface states pass, every collected character is inside the corpus, no label is clipped in any shipped language, and 10 number-fit runs × 10 magnitudes leave no number outside its box.
 
-**Eleven cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat.
+**Thirteen cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat. One of those negatives is about the tests themselves: the morph check was blind on macOS, where the window edge moves after the CSS class it sampled had already gone (round 12), so it now grades the observed motion instead.
 
 <details>
-<summary>Cloud build history (rounds 1–11)</summary>
+<summary>Cloud build history (rounds 1–13)</summary>
 
 **Cloud round 1 (`9faa78e`, four native runners)**: Windows x64 green; Linux x64 misread "the debugger socket closed before the reply" during shutdown as a failure; both macOS builds signed and verified, but the packaged-app launch check timed out on its first CDP round trip.
 
@@ -215,6 +215,9 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 **Round 11 (`v2.6.0` tag, run 40801968504)**: pushing the tag alone triggered the tag pipeline, all four runners passed, and the release job verified the six packages, generated `SHA256SUMS.txt` and published. The Windows package was re-downloaded from the release page, its SHA256 matched the list, and it was extracted and launched here through the same assertions as any other build (`isPackaged`, version 2.6.0). The Linux and macOS packages are covered by their own runners only.
 
+**Round 12 (`a244fa4`, a docs-only commit) failed on macOS again — in the test, not the product**: the morph check reported `596 -> 593` on Apple Silicon although the same code had been green on that runner one CI round earlier. The sampler stopped with the CSS class it watched, and macOS applies `setSize` on its own schedule, so on a loaded runner the window edge moved after the class had gone. The measurement was blind; the animation was happening.
+
+**Round 13 (`c52a77e`, all four green)**: the morph is now graded from the frames where the edge actually moved, with up to three sampling attempts recorded per run. Proved against a real jump — forcing the morph duration to 1ms makes the check fail with "biggest single step 668px of 668px".
 </details>
 
 **What the macOS keychain really means in CI**: running from source probes `keychain` (the unsigned Electron entry is pre-authorized on the runner), while the **packaged app stays at `pending`** — the system never answers. The checks now accept and report that instead of hanging, but it means **real Keychain encryption in the packaged macOS app has never been verified anywhere**, and this README does not claim it has.
@@ -227,11 +230,12 @@ The interface is authored in Chinese, and every other language is a dictionary k
 | `npm run check:docs` | Parity gate across the five READMEs: each one links every other language and marks itself current, and all share the same section structure, screenshots, `<details>` balance and working markdown / HTML / cross-language links |
 | `npm run test:parse` | Parsing, aggregation, both paces and edge cases; no GUI needed |
 | `npm run test:store` | 22 assertion groups over mocked system backends: lazy probe, refusal while pending, ciphertext retention, `plain:` upgrade and the accepted language list; not a real keyring |
-| `npm run test:ui` | Forms, themes, privacy, settings, credential branches and clearing, restart restore, morph sampling, the switch to English followed by a restart, and a picker round trip through Spanish, Portuguese and German that must reload the window and re-highlight the saved language. Every phase except the unpinned ones pins Chinese, because the assertions are written for one language and the host language is not ours to assume (the first version of this failed on all four runners, whose hosts answer in English) |
+| `npm run test:ui` | Forms, themes, privacy, settings, credential branches and clearing, restart restore, morph sampling, the switch to English followed by a restart, and a picker round trip through Spanish, Portuguese and German that must reload the window and re-highlight the saved language. The morph is graded from the frames where the window edge actually moved and may take up to three sampling attempts, all of which are recorded — a pass that needed a retry is evidence about the runner, not a hidden second chance. Every phase except the unpinned ones pins Chinese, because the assertions are written for one language and the host language is not ours to assume (the first version of this failed on all four runners, whose hosts answer in English) |
 | `npm run test:i18n` | The Chromium language / timezone, font and label-fitting checks described below |
+| `npm run test:numbers` | Drives ten magnitude ladders — from ¥0.01 and 7 tokens to a ¥99,999,999.99 balance, 109.6 million tokens, a `999+` runway and long model ids — through the real render path in all five languages and both window forms, and fails if any number escapes the box it was laid out for. It runs in a live window on purpose: showcase mode lays the card out on a wider marketing canvas, and the first version of this check measured there and missed a real 5px overflow It also records where the instrument stops: at ¥99,999,999,999.99 spent in a day, the strip's today figure is the one slot whose type floor gives out (32px, in all five languages) while the ledger still shows it — the check asserts exactly that, so a new slot breaking at the extreme still fails. |
 | `npm run test:packaged` | Directory build: launch, fonts, version and form restore |
 | `npm run test:distributable` | Extracts the real ZIP / DMG / AppImage from `release/` and launches the executable inside it; never falls back to `dist/` |
-| `npm run render:live` | Live forensics and screenshots; `npm run shots` refreshes the showcase images |
+`npm run shots` refreshes the five demo-state showcase images; the per-language variants (`deck-en`, `deck-es`, `deck-pt-BR`, `deck-de`, `strip-en`) come from `node scripts/launch.mjs --shot=<name> --locale=<locale>`
 
 Regression runs use isolated config directories and demo data. The credential failure path does send a deliberately invalid test key to DeepSeek and accepts either an auth or a network error: it is not an offline mock, and it is not a positive test against a real account.
 The morph brightness proxy is `min(per frame max(strip opacity, deck opacity))`, not a sum of the two layers, and that sampling does not prove the absence of ghosting everywhere.
@@ -252,7 +256,7 @@ These checks do **not** prove complete cmap coverage, every fallback glyph, nati
 
 ## GitHub Actions and releases
 
-The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published once.
+The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published three times — v2.4.1, v2.5.0 and v2.6.0.
 A local `git commit` triggers nothing in the cloud; a push, a pull request or a manual run does. GitHub Packages is for npm / container registries and the like — this project distributes desktop binaries through Artifacts and Release assets.
 
 | Trigger | Behaviour |
@@ -262,9 +266,9 @@ A local `git commit` triggers nothing in the cloud; a push, a pull request or a 
 | Push a `v*` tag | The tag must equal `v` + `package.json` version; a Release is published only after all four runners succeed |
 
 The runners are `windows-2022` x64, `ubuntu-22.04` x64, `macos-15` arm64 and `macos-15-intel` x64, on Node.js 24.
-Every job starts with `npm run check:release`: the host must match the matrix, the version must agree in four places, and on a tag the name must equal `v` + version.
+Every build job starts with `npm run check:release` and `npm run check:docs`: the host must match the matrix, the version must agree in four places, on a tag the name must equal `v` + version, and the five documents must still mirror each other. The release job runs neither, because the four build jobs already checked the same thing before uploading.
 The Linux UI runs on a virtual X11 desktop (Xvfb + Openbox), which does not mean GNOME or Wayland sessions are verified.
-The macOS build step retries the `dmgbuild` detach race at most three times and only unmounts volumes named `Token Monitor*`; when the retries run out the job fails rather than hiding a real packaging error.
+The macOS build step allows the `dmgbuild` step three attempts in total and only unmounts volumes named `Token Monitor*`; when the attempts run out the job fails rather than hiding a real packaging error.
 The packaged-app check accepts `pending` (the system never answered about the keychain) as a reported state and continues with the remaining assertions, but records it explicitly instead of counting it as verified encryption.
 Package Artifacts are kept **14 days**, test diagnostics 7 days; a downloaded Artifact may need one more archive extraction.
 
@@ -274,7 +278,7 @@ A Release must contain six packages plus `SHA256SUMS.txt`, prefixed `token-monit
 - `mac-arm64.dmg`, `mac-arm64.zip`
 - `mac-x64.dmg`, `mac-x64.zip`
 
-A tag containing `-` (for example `v2.5.0-beta.1`) is published as a pre-release; a plain version tag is published as the latest stable release. An existing public Release is never overwritten — publish a new version instead.
+A tag containing `-` (for example `v2.7.0-beta.1`) is published as a pre-release; a plain version tag is published as the latest stable release. An existing public Release is never overwritten — publish a new version instead.
 
 ### Publishing
 

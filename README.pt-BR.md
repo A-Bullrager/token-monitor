@@ -176,7 +176,7 @@ A interface é escrita em chinês, e cada outro idioma é um dicionário cujas c
 - **Idiomas incluídos**: chinês (o idioma de escrita), inglês, espanhol, português do Brasil e alemão. `Auto` casa o idioma do sistema pelo prefixo — `zh*`, `es*`, `pt*`, `de*`, `en*` — e todo o resto cai no inglês, o único reserva que qualquer fonte incluída consegue renderizar. `pt-PT` recebe portanto o dicionário brasileiro; `es-MX` e `es-ES` compartilham um só espanhol.
 - **O que é traduzido**: as duas formas da janela, a gaveta de configurações, a lista de atalhos, os avisos, as mensagens de erro, o menu da bandeja, a dica da bandeja e o menu do aplicativo no macOS — mais a cartela ASCII do instrumento (`DAYS`, `TOTAL`, `SAMPLE`, `AVG`, `PEAK ¥29.10 · 10-03`, `SYNCED 18:02:18`), que em chinês também aparece em inglês.
 - **O que não é traduzido**: o nome do produto, o slogan `Know your runway.`, `DeepSeek`, os nomes de campo `API KEY` / `SESSION TOKEN` e os códigos de instrumento `DEMO`, `SYNC`, `30D / 7D` e as unidades de ordem `M` / `K`.
-- **Números e datas seguem o idioma**: o chinês agrupa os tokens em 万 / 亿 e escreve o fim como `约 3 月 5 日见底`; o inglês usa `12.5K` e `Runs out Mar 5`; o espanhol `12,5 mil` e `Se agota 5 mar`; o português `12,5 mil` e `Acaba 5 de mar.`; o alemão `12.500` e `Am 5. März leer`. As quantidades por trás são idênticas, e as checagens as comparam numericamente.
+- **Números e datas seguem o idioma**: o chinês agrupa os tokens em 万 / 亿 e escreve o fim como `约 3 月 5 日见底`; o inglês usa `12.5K` e `Runs out Mar 5`; o espanhol `12,5 mil` e `Se agota 5 mar`; o português `12,5 mil` e `Acaba 5 de mar.`; o alemão `12.500` e `Am 5. März leer`. As quantidades por trás são idênticas, e as checagens as comparam numericamente. Um número longo demais para o espaço dele —¥99.999.999,99 numa coluna calculada para ¥1,49— reduz o próprio tipo até caber, em vez de ser cortado.
 - **O plural é de cada idioma**: o chinês não marca número gramatical, então cada dicionário flexiona o próprio substantivo contado (`1 día activo` / `15 días activos`, `1 Tag` / `15 Tage`). A checagem de paridade recusa um idioma cuja forma de um e de muitos saiam iguais, e trata `1.0` medido como plural.
 - **Limite conhecido**: o dinheiro mantém um único estilo decimal em todos os idiomas (`¥145.09`), assim como o relógio. Só as contagens de tokens seguem o agrupamento do idioma. Trocar o idioma salva o ajuste e **recarrega a janela** — o único ajuste que faz isso, porque texto já escrito na página não pode ser retraduzido no lugar.
 
@@ -184,12 +184,12 @@ A interface é escrita em chinês, e cada outro idioma é um dicionário cujas c
 
 ## Testes e o que eles provam
 
-**Local (Windows 10 x64)**: passam os testes de dados, 22 grupos de asserções sobre backends de armazenamento simulados, a paridade dos dicionários, a demanda de glifos, a interface pelo código, a compilação em diretório e uma extração e inicialização reais do ZIP; passam 16 cenários de idioma × 4 estados da interface, todo caractere coletado está dentro do corpus e nenhum rótulo fica cortado em nenhum idioma incluído. fontTools foi usado contra os cmap reais dos subconjuntos: todo caractere latino que os dicionários podem pôr na tela está no subconjunto do Inter, e todo caractere chinês do conjunto de demanda está em um dos dois pacotes.
+nenhum rótulo fica cortado em nenhum idioma incluído; nas 10 passadas de caimento de número × 10 escalas de magnitude também nenhum número sai da caixa.
 
-**Onze rodadas na nuvem até aqui; a versão publicada está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva.
+**Treze rodadas na nuvem até aqui; a versão publicada está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva. Um daqueles negativos é sobre os próprios testes: a checagem da deformação estava cega no macOS, onde a borda da janela se move depois que a classe CSS que ela amostrava já tinha sumido (rodada 12), então agora ela avalia o movimento observado.
 
 <details>
-<summary>Histórico de compilações na nuvem (rodadas 1–11)</summary>
+<summary>Histórico de compilações na nuvem (rodadas 1–13)</summary>
 
 **Rodada 1 na nuvem (`9faa78e`, quatro runners nativos)**: Windows x64 verde; Linux x64 leu errado "o socket do depurador fechou antes da resposta" durante o encerramento e tomou como falha; as duas compilações de macOS foram assinadas e verificadas, mas a checagem de inicialização do app empacotado expirou na primeira ida e volta CDP.
 
@@ -214,6 +214,9 @@ A interface é escrita em chinês, e cada outro idioma é um dicionário cujas c
 **Rodada 10 (`819601e`, os quatro verdes)**: a varredura de caimento agora acumula todo cenário e estado e falha uma vez com a lista inteira, e o texto em inglês virou `15 active days of 30` — a mesma frase com menos caracteres, que é a diferença entre um rótulo e um rótulo cortado.
 **Rodada 11 (tag `v2.6.0`, execução 40801968504)**: enviar a tag sozinha ativou o pipeline de tag, os quatro runners passaram e o job de lançamento conferiu os seis pacotes, gerou `SHA256SUMS.txt` e publicou. O pacote do Windows foi baixado de novo da página do lançamento, seu SHA256 bateu com a lista, e ele foi extraído e iniciado aqui pelas mesmas asserções de qualquer outra compilação (`isPackaged`, versão 2.6.0). Os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners.
 
+**Rodada 12 (`a244fa4`, um commit só de documentação) falhou de novo no macOS — no teste, não no produto**: a checagem da deformação reportou `596 -> 593` no Apple Silicon embora o mesmo código tivesse ficado verde naquele runner uma rodada antes. A amostragem parava com a classe CSS observada, e o macOS aplica `setSize` no próprio ritmo: com o runner ocupado, a borda da janela se moveu depois que a classe tinha sumido. A medição estava cega; a animação aconteceu.
+
+**Rodada 13 (`c52a77e`, os quatro verdes)**: a deformação passou a ser avaliada pelos quadros em que a borda realmente se move, com até três amostragens registradas por execução. Conferido contra um salto real: forçar a duração para 1ms faz a checagem falhar com "biggest single step 668px of 668px".
 </details>
 
 **O que o chaveiro do macOS realmente significa no CI**: rodar pelo código sonda `keychain` (a entrada do Electron não assinado vem pré-autorizada no runner), enquanto **o app empacotado fica em `pending`** — o sistema nunca responde. As checagens agora aceitam e relatam isso em vez de travar, mas isso significa que **a criptografia real do Chaveiro no app empacotado do macOS nunca foi verificada em lugar nenhum**, e este README não afirma que foi.
@@ -226,11 +229,12 @@ A interface é escrita em chinês, e cada outro idioma é um dicionário cujas c
 | `npm run check:docs` | Porta de paridade entre os cinco README: cada um linka todos os outros idiomas e se marca como o atual, e todos compartilham a mesma estrutura de seções, as mesmas capturas, `<details>` equilibrados e links markdown / HTML / entre idiomas funcionando |
 | `npm run test:parse` | Parse, agregação, os dois ritmos e casos-limite; sem interface gráfica |
 | `npm run test:store` | 22 grupos de asserções sobre backends do sistema simulados: sondagem preguiçosa, recusa enquanto pendente, retenção do cifrado existente, atualização de `plain:` e a lista de idiomas aceitos; não é um chaveiro real |
-| `npm run test:ui` | Formas, temas, privacidade, configurações, ramos de credencial e limpeza, restauração após reinício, amostragem da deformação, a troca para inglês seguida de reinício e um percurso pelo seletor em espanhol, português e alemão que precisa recarregar a janela e redestacar o idioma salvo. Todas as fases, menos as que de propósito não fixam nada, fixam chinês, porque as asserções são escritas para um idioma e o idioma do host não é nosso para supor (a primeira versão disso falhou nos quatro runners, cujos hosts respondem em inglês) |
+| `npm run test:ui` | Formas, temas, privacidade, configurações, ramos de credencial e limpeza, restauração após reinício, amostragem da deformação, a troca para inglês seguida de reinício e um percurso pelo seletor em espanhol, português e alemão que precisa recarregar a janela e redestacar o idioma salvo. Todas as fases, menos as que de propósito não fixam nada, fixam chinês, porque as asserções são escritas para um idioma e o idioma do host não é nosso para supor (a primeira versão disso falhou nos quatro runners, cujos hosts respondem em inglês) A deformação é avaliada pelos quadros em que a borda da janela realmente se move e pode levar até três amostragens, todas registradas — passar na segunda é evidência sobre o runner, não uma segunda chance escondida. |
 | `npm run test:i18n` | As checagens de idioma / fuso do Chromium, de fonte e de caimento de rótulo descritas abaixo |
+| `npm run test:numbers` | Passa dez escalas de magnitude — de ¥0,01 e 7 tokens a um saldo de ¥99.999.999,99, 109,6 milhões de tokens, uma autonomia `999+` e ids de modelo longos — pelo caminho real de renderização nos cinco idiomas e nas duas formas de janela, e falha se algum número sair da caixa para a qual foi calculado. Ele roda numa janela de propósito: o modo vitrine coloca o cartão numa tela publicitária mais larga, e a primeira versão dessa checagem mediu ali e deixou passar um estouro real de 5px Ele também registra onde o instrumento para: com ¥99.999.999.999,99 gastos num dia, o valor de hoje da faixa é o único espaço cujo limite de corpo cede (32px, nos cinco idiomas) enquanto o extrato ainda o mostra — a checagem afirma exatamente isso, então um espaço novo que quebre no extremo ainda falha. |
 | `npm run test:packaged` | Compilação em diretório: inicialização, fontes, versão e restauração da forma |
 | `npm run test:distributable` | Extrai o ZIP / DMG / AppImage real de `release/` e inicia o executável que está dentro; nunca recai para `dist/` |
-| `npm run render:live` | Forense e capturas ao vivo; `npm run shots` atualiza as imagens da vitrine |
+`npm run shots` atualiza as cinco imagens de demonstração da vitrine; as variantes por idioma (`deck-en`, `deck-es`, `deck-pt-BR`, `deck-de`, `strip-en`) vêm de `node scripts/launch.mjs --shot=<nome> --locale=<idioma>`
 
 As regressões usam diretórios de configuração isolados e dados de demonstração. O caminho de falha de credencial manda sim para o DeepSeek uma chave de teste deliberadamente inválida e aceita erro de autenticação ou de rede: não é mock offline e não é teste positivo contra uma conta real.
 O proxy de brilho da deformação é `min(max(opacidade da faixa, opacidade do extrato) por quadro)`, não uma soma das duas camadas, e essa amostragem não prova ausência de fantasma em todo lugar.
@@ -261,9 +265,9 @@ Um `git commit` local não dispara nada na nuvem; um push, um pull request ou um
 | Enviar uma tag `v*` | A tag tem que ser `v` + a versão do `package.json`; a Release é publicada só depois que os quatro runners têm sucesso |
 
 Os runners são `windows-2022` x64, `ubuntu-22.04` x64, `macos-15` arm64 e `macos-15-intel` x64, no Node.js 24.
-Todo job começa com `npm run check:release`: o host tem que casar com a matriz, a versão tem que concordar em quatro lugares e, numa tag, o nome tem que ser `v` + versão.
+Todo job de build começa com `npm run check:release` e `npm run check:docs`: o host tem que casar com a matriz, a versão tem que concordar em quatro lugares, numa tag o nome tem que ser `v` + versão, e os cinco documentos têm que continuar se espelhando. O job de release não roda nenhum dos dois, porque os quatro jobs de build já conferiram a mesma coisa antes de enviar.
 A interface no Linux roda em um desktop X11 virtual (Xvfb + Openbox), o que não significa que sessões GNOME ou Wayland estejam verificadas.
-O passo de compilação do macOS retenta a corrida de desmontagem do `dmgbuild` no máximo três vezes e só desmonta volumes chamados `Token Monitor*`; quando as tentativas acabam, o job falha em vez de esconder um erro real de empacotamento.
+O passo de compilação do macOS permite ao passo do `dmgbuild` três tentativas no total e só desmonta volumes chamados `Token Monitor*`; quando as tentativas acabam, o job falha em vez de esconder um erro real de empacotamento.
 A checagem do app empacotado aceita `pending` (o sistema nunca respondeu sobre o chaveiro) como estado relatado e segue com as outras asserções, mas registra isso explicitamente em vez de contar como criptografia verificada.
 Os Artifacts de pacote ficam **14 dias**, os diagnósticos de teste 7; um Artifact baixado pode precisar de mais uma extração de arquivo.
 
@@ -273,7 +277,7 @@ Uma Release precisa conter seis pacotes mais `SHA256SUMS.txt`, com o prefixo `to
 - `mac-arm64.dmg`, `mac-arm64.zip`
 - `mac-x64.dmg`, `mac-x64.zip`
 
-Uma tag com `-` (por exemplo `v2.5.0-beta.1`) é publicada como pré-lançamento; uma tag de versão simples é publicada como a versão estável mais recente. Uma Release pública existente nunca é sobrescrita — publique uma versão nova.
+Uma tag com `-` (por exemplo `v2.7.0-beta.1`) é publicada como pré-lançamento; uma tag de versão simples é publicada como a versão estável mais recente. Uma Release pública existente nunca é sobrescrita — publique uma versão nova.
 
 ### Publicar
 
