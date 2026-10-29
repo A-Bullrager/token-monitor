@@ -26,17 +26,29 @@ function applyLanguage(root) {
 // Non-Chinese modes translate text where it is written, so no render path has
 // to remember to translate. Translated output no longer matches the CJK test,
 // so the observer cannot feed on its own writes.
+function refitNumbers() {
+  for (const node of fittedNodes) {
+    if (node.isConnected) fitNumber(node)
+    else fittedNodes.delete(node)
+  }
+}
+
 function installLanguageMirror() {
   if (!I18N || !TRANSLATE || typeof MutationObserver === 'undefined') return
   const observer = new MutationObserver((records) => {
+    let touchedNumbers = false
     for (const record of records) {
       if (record.type === 'characterData') {
         const next = I18N.t(record.target.nodeValue, LOCALE)
-        if (next !== record.target.nodeValue) record.target.nodeValue = next
+        if (next !== record.target.nodeValue) {
+          record.target.nodeValue = next
+          if (record.target.parentElement && fittedNodes.has(record.target.parentElement)) touchedNumbers = true
+        }
       } else if (record.type === 'childList') {
         for (const added of record.addedNodes) {
           if (added.nodeType === 1 || added.nodeType === 3) I18N.applyTree(added, LOCALE)
         }
+        touchedNumbers = true
       } else {
         const value = record.target.getAttribute(record.attributeName)
         if (!value) continue
@@ -44,6 +56,8 @@ function installLanguageMirror() {
         if (next !== value) record.target.setAttribute(record.attributeName, next)
       }
     }
+    // The translated text is what has to fit, so fitting runs after it lands.
+    if (touchedNumbers) requestAnimationFrame(refitNumbers)
   })
   observer.observe(document.body, {
     characterData: true,
@@ -271,8 +285,27 @@ function setRunwayType(node, value, base, compact = false) {
 // shrink the type until the text measurably fits — measured against the box
 // that actually clips it, so it works for every language and every digit
 // count — and stop at a floor below which the number stops being readable.
-function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
+// Nodes the app has fitted, so every later change to their text re-fits them.
+// A one-shot measurement at render time is not enough: the language mirror can
+// rewrite a label a few frames later, webfonts land after first paint, and a
+// machine that is slower at either would keep a size decided against metrics
+// that no longer apply.
+const fittedNodes = new Set()
+
+function fitNumber(node, { floor = 0.7, steps = 4, waits = 30 } = {}) {
   if (!node) return
+  fittedNodes.add(node)
+  // No layout yet means every width below is zero and "it fits" is a lie. Ask
+  // again on the next frame instead of quietly deciding nothing is needed —
+  // this is exactly how a number can pass on one machine and overflow on
+  // another that paints later. Bounded, because a hidden form (the deck while
+  // the strip shows) legitimately has no width to wait for.
+  if (!node.clientWidth) {
+    if (waits > 0 && typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => fitNumber(node, { floor, steps, waits: waits - 1 }))
+    }
+    return
+  }
   node.style.fontSize = ''
   const base = parseFloat(getComputedStyle(node).fontSize)
   if (!Number.isFinite(base)) return
@@ -584,6 +617,11 @@ function renderStrip() {
       el.stripPaceCaption.removeAttribute('title')
     }
   }
+
+  // A micro caption is already small, so it gets a gentle floor: the widest
+  // observed overflow on another platform's font metrics was 4px, and 10% of
+  // headroom costs nothing a reader would notice.
+  fitNumber(el.stripPaceCaption, { floor: 0.9 })
 
   el.stripBalance.textContent = b ? money(b.total) : money(null)
   fitNumber(el.stripBalance)
@@ -1143,6 +1181,9 @@ function renderMix() {
               : ''
           }`
     el.mixList.appendChild(row)
+    // Fitted after insertion: off-document there is no width to measure, and a
+    // German "98,8 Mio." was the 2px that a macOS runner reported.
+    fitNumber(tokens, { floor: 0.9 })
   })
 }
 
@@ -1763,6 +1804,14 @@ async function init() {
     updatePinButtons(Boolean(state.config?.alwaysOnTop))
     bindEvents()
     await refresh({ initial: true })
+    // Webfonts land after the first paint, and a width measured against the
+    // fallback is not the width the number will end up occupying: on a slower
+    // machine the fitted size was decided before Inter arrived. Re-render once
+    // the real metrics are in, so fitting is measured against what ships.
+    document.fonts?.ready?.then(() => {
+      renderStrip()
+      renderDeck()
+    }, () => {})
     if (AUTO_SETTINGS) {
       setTimeout(() => openSettings({ focus: false }), 420)
     }

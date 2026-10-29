@@ -193,6 +193,12 @@ const MEASURE = `(() => {
     out.push({
       where: el.id || (typeof el.className === 'string' && el.className.split(' ')[0]) || el.tagName,
       text: own.slice(0, 60),
+      // Without these, a remote failure on a runner nobody has locally is a
+      // guess: the inline size shows whether the app's own fitting ran, and
+      // client/scroll show what it measured against.
+      fit: el.style.fontSize || 'none',
+      size: getComputedStyle(el).fontSize,
+      box: [el.clientWidth, el.scrollWidth],
       pixels: Math.round(Math.max(overflowed ? el.scrollWidth - el.clientWidth : 0,
         el.getBoundingClientRect().right - limitOf(el)))
     })
@@ -320,7 +326,30 @@ async function runOne(locale, view) {
     await evaluate('(() => { window.__tmBaseline = JSON.parse(JSON.stringify(state.data)); return true })()')
     for (const fixture of FIXTURES) {
       await evaluate(APPLY(fixture.name, fixture.ops))
+      // Measure the settled page. Webfonts reflow text after the first paint,
+      // and a fit decided against the fallback metrics is the bug this check
+      // exists to catch — macOS reported exactly that as a phantom overflow.
+      await evaluate('document.fonts.ready.then(() => true)')
       await sleep(120) // Let the language mirror settle after the re-render.
+      // Prove the fitter actually ran, not just that the page looks fine: a
+      // silent no-op on another platform would otherwise pass by luck until a
+      // wider font made the same number overflow again.
+      if (fixture.name === 'millions') {
+        const engaged = await evaluate(`(() => {
+          const node = document.getElementById('stripToday')
+          return {
+            shown: !!node && node.getClientRects().length > 0,
+            inline: node?.style.fontSize || '',
+            size: node ? getComputedStyle(node).fontSize : ''
+          }
+        })()`)
+        // Only assert where the element is actually laid out: in the deck form
+        // the strip is display:none, so fitting correctly does nothing there.
+        if (engaged.shown) {
+          assert.ok(engaged.inline !== '' && parseFloat(engaged.size) < 16,
+            `${label}: the ¥123,456.78 figure was never shrunk (inline ${JSON.stringify(engaged.inline)}, computed ${engaged.size})`)
+        }
+      }
       // Fitting must be invisible until it is needed: if the demo account
       // already triggered a shrink, the shipped look has changed under everyone.
       if (fixture.name === 'demo baseline') {
@@ -388,9 +417,14 @@ const atTheLimit = offenders.filter((item) => advisoryNames.has(item.fixture))
 // still shows it. Asserting the exact set keeps that honest: a *new* slot
 // breaking at the extreme, or this one silently getting worse elsewhere, fails.
 const limitSlots = [...new Set(atTheLimit.map((item) => `${item.run} ${item.slot}`))].sort()
+// Derived from the runs that happened, so --only=<locale> stays honest.
+const expectedLimit = [...new Set(results.map((run) => run.label))]
+  .filter((label) => label.endsWith('/strip'))
+  .map((label) => `${label} stripToday`)
+  .sort()
 assert.deepEqual(unexpected, [],
   `${unexpected.length} numbers escape their box: ${JSON.stringify(unexpected.slice(0, 12))}`)
-assert.deepEqual(limitSlots, i18n.LOCALES.map((locale) => `${locale}/strip stripToday`).sort(),
+assert.deepEqual(limitSlots, expectedLimit,
   `the extreme fixture was expected to overflow exactly the strip's today figure, got ${JSON.stringify(limitSlots)}`)
 const widest = {}
 for (const run of results) {
