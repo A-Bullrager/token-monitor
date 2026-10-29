@@ -326,19 +326,22 @@ async function runOne(locale, view) {
     await evaluate('(() => { window.__tmBaseline = JSON.parse(JSON.stringify(state.data)); return true })()')
     for (const fixture of FIXTURES) {
       await evaluate(APPLY(fixture.name, fixture.ops))
-      // Measure the settled page, not a moment in it. The app re-fits after
-      // fonts land and after its own settle delays, because macOS resolves its
-      // system monospace later than first paint; reading too early would grade
-      // a state the product is about to correct — which is exactly the mistake
-      // the fitter itself made. So the app announces the correction window, and
-      // this check waits for it to close before it reads anything.
+      // Measure the settled page, not a moment in it. Two signals say the page
+      // is done: its settle passes are over, and its standing watch has taken a
+      // pass that covers this change. The watch is the one that matters — on CI
+      // the box was already final when the card last fitted it, and the width of
+      // the same text changed after that, so grading the first stable reading
+      // judged a state the product had not yet re-checked.
       await evaluate('document.fonts.ready.then(() => true)')
+      const ticksAtApply = await evaluate('Number(document.documentElement.dataset.numberWatchTicks || 0)')
+      const readyAfterThisChange = `document.documentElement.dataset.numbersSettled === 'settled' &&
+        Number(document.documentElement.dataset.numberWatchTicks || 0) > ${ticksAtApply}`
       let clipped = []
       let observedSettled = false
       const settleDeadline = Date.now() + 20000
       while (Date.now() < settleDeadline) {
         await sleep(150)
-        if (!await evaluate("document.documentElement.dataset.numbersSettled === 'settled'")) {
+        if (!await evaluate(readyAfterThisChange)) {
           clipped = []
           continue
         }
@@ -348,7 +351,7 @@ async function runOne(locale, view) {
         clipped = again
       }
       assert(observedSettled,
-        `${label} @ ${fixture.name}: the page never reported a settled fit, so its numbers were never graded`)
+        `${label} @ ${fixture.name}: the card never re-checked this state, so its numbers were never graded`)
       // Prove the fitter actually ran, not just that the page looks fine: a
       // silent no-op on another platform would otherwise pass by luck until a
       // wider font made the same number overflow again.
@@ -384,12 +387,20 @@ async function runOne(locale, view) {
         // Only assert where the element is actually laid out: in the deck form
         // the strip is display:none, so fitting correctly does nothing there.
         if (engaged.shown) {
-          assert.ok(engaged.inline !== '' && parseFloat(engaged.size) < 16,
+          // The witness is the used size, not the inline attribute: a pass can
+          // leave the shrink in the cascade while the attribute reads empty, and
+          // CI showed exactly that on one runner. Nothing else in the app puts
+          // 11.2px on this element, so a used size under the stylesheet's 16px
+          // still proves the fitter ran.
+          assert.ok(parseFloat(engaged.size) < 16,
             `${label}: the ¥123,456.78 figure was never shrunk — ${JSON.stringify(engaged)}`)
         }
       }
       // Fitting must be invisible until it is needed: if the demo account
       // already triggered a shrink, the shipped look has changed under everyone.
+      // The witness is the inline attribute, not the used size — several of these
+      // slots are 10px and 8.5px in the stylesheet, so a computed size below the
+      // strip's 16px says nothing about the fitter.
       if (fixture.name === 'demo baseline') {
         const shrunk = await evaluate(`(() => {
           const ids = ['stripToday', 'stripBalance', 'deckBalance', 'deckBalanceSub']

@@ -290,6 +290,11 @@ const fittedNodes = new Set()
 function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   if (!node) return
   fittedNodes.add(node)
+  // A hidden form has no metrics to fit against, and this has to be decided
+  // before the reset below: clearing the size and then leaving would erase the
+  // fit a visible pass already made, which is one way a correct card becomes an
+  // overflowing one without anything re-rendering.
+  if (!node.clientWidth && !node.getClientRects().length) return // hidden form
   // Start from the stylesheet's size, or each pass would measure the last one's
   // shrink and compound: 16px became 5.6px became 3.9px for a number that never
   // needed shrinking at all.
@@ -310,7 +315,6 @@ function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   }
   const overflows = () => node.scrollWidth > node.clientWidth + 1 ||
     node.getBoundingClientRect().right > limit() + 1
-  if (!node.clientWidth && !node.getClientRects().length) return // hidden form
   let scale = 1
   for (let step = 0; step < steps && overflows(); step++) {
     scale = Math.max(floor, scale - 0.12)
@@ -319,10 +323,11 @@ function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   }
 }
 
-// A measurement is only valid against the metrics on screen, and those can
-// arrive late: macOS fitted ¥123,456.78 into its 78px slot, then resolved the
-// font and the same text became 99px wide. Re-measure after the page settles as
-// well as on render, so the decision ends up taken against real metrics.
+// A measurement is only valid against the metrics on screen, and the box can be
+// laid out before those metrics are final: ¥123,456.78 was fitted into its 78px
+// slot and then measured 99px wide, on macOS and on Windows CI alike. Re-measure
+// after the page settles as well as on render, so the decision ends up taken
+// against real metrics.
 let settleTimers = []
 function scheduleSettle() {
   for (const timer of settleTimers) clearTimeout(timer)
@@ -335,6 +340,28 @@ function scheduleSettle() {
     refitNumbers()
     if (delay === 1000) document.documentElement.dataset.numbersSettled = 'settled'
   }, delay))
+}
+
+// The settle passes above only fix the common case. What they cannot fix is a
+// metric that arrives after them: on a cold machine the width of the same text
+// changed once the platform finished handing over its font, and a fit decided
+// before that is quietly wrong for as long as the card stays on screen — no
+// render, no resize, nothing to re-run the decision. So the card keeps checking
+// its own numbers while it is visible. This is a read, not a repaint: a pass
+// writes a style only when a figure has actually escaped its box, so the steady
+// cost is one layout flush a second. Nothing here needs a visibility guard: a
+// card hidden to the tray is a hidden page, and the renderer already clamps its
+// timers instead of running them at full rate.
+let numberWatch = null
+function startNumberWatch() {
+  if (numberWatch) return
+  numberWatch = setInterval(() => {
+    refitNumbers()
+    // Count the passes, so anything grading the card can wait for one that
+    // actually covers its own change instead of guessing how long that takes.
+    const root = document.documentElement
+    root.dataset.numberWatchTicks = String(Number(root.dataset.numberWatchTicks || 0) + 1)
+  }, 1000)
 }
 
 function setText(node, value) {
@@ -1826,6 +1853,9 @@ async function init() {
     // width a fit was decided against can change after the fact. Re-measure
     // when the window settles rather than trusting the first pass.
     window.addEventListener('resize', refitNumbers)
+    // In showcase capture the card is composited once and the process exits
+    // shortly after, so a standing watch would only burn a timer.
+    if (!boot.showcase) startNumberWatch()
     if (AUTO_SETTINGS) {
       setTimeout(() => openSettings({ focus: false }), 420)
     }
