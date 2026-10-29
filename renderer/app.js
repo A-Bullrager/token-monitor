@@ -173,13 +173,16 @@ function plainMoney(value, digits = 2) {
 // in the headline, which has the room for them.
 function moneySummary(value) {
   if (value == null || !Number.isFinite(Number(value))) return '—'
-  const head = currencySymbol()
-  if (state.privacy) return `${head}••`
+  if (state.privacy) return `${currencySymbol()}••`
   const n = Number(value)
-  if (Math.abs(n) < 1e6) return `${head}${formatNumber(n, 2)}`
-  if (TRANSLATE) return `${head}${I18N.compactCount(n, LOCALE)}`
-  if (Math.abs(n) >= 1e8) return `${head}${(n / 1e8).toFixed(2)} 亿`
-  return `${head}${(n / 1e4).toFixed(Math.abs(n) >= 1e7 ? 0 : 1)} 万`
+  if (Math.abs(n) < 1e6) return `${currencySymbol()}${formatNumber(n, 2)}`
+  // The compact form carries no currency sign: the line sits directly under a
+  // balance that already shows it, and on an Apple Silicon runner the German
+  // version of this line measured 208px in a 202px box — two ¥ signs were the
+  // difference between a number and a clipped one.
+  if (TRANSLATE) return I18N.compactCount(n, LOCALE)
+  if (Math.abs(n) >= 1e8) return `${(n / 1e8).toFixed(2)} 亿`
+  return `${(n / 1e4).toFixed(Math.abs(n) >= 1e7 ? 0 : 1)} 万`
 }
 
 function formatTokens(value) {
@@ -864,7 +867,10 @@ function renderDeck() {
   setText(el.deckBalanceSub, b
     ? `充值 ${moneySummary(b.topup)} · 赠金 ${moneySummary(b.grant)}`
     : '尚未读取到余额')
-  fitNumber(el.deckBalanceSub)
+  // A micro line gets a little more room than the default floor: on a runner
+  // where the German version of this text measured 208px against a 202px box,
+  // the difference between a number and a clipped one was one more step.
+  fitNumber(el.deckBalanceSub, { floor: 0.65 })
 
   el.deckToday.textContent = u ? money(u.today?.cost) : money(null)
   fitNumber(el.deckToday)
