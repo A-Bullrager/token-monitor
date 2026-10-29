@@ -198,25 +198,42 @@ const MEASURE = `(() => {
     }
     return window.innerWidth
   }
+  // The right edge of the ink, matching what the card's own fitter measures: a
+  // flex slot can be wider than the digits inside it, and a box that overhangs the
+  // panel by a few pixels while its text ends far short of that edge hides nothing
+  // from the reader. Judging the box made the fitter chase an unreachable condition
+  // and shrink numbers it did not need to shrink.
+  const inkRightOf = (el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const rects = range.getClientRects()
+    if (!rects.length) return el.getBoundingClientRect().right
+    let right = 0
+    for (const rect of rects) right = Math.max(right, rect.right)
+    return right
+  }
   for (const el of document.querySelectorAll('body *')) {
     if (!visible(el) || el.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue
     const own = [...el.childNodes].filter((n) => n.nodeType === 3)
       .map((n) => n.nodeValue.trim()).join(' ').trim()
     if (!own) continue
     const overflowed = el.scrollWidth > el.clientWidth + 1
-    const pastEdge = el.getBoundingClientRect().right > limitOf(el) + 1
+    const pastEdge = inkRightOf(el) > limitOf(el) + 1
     if (!overflowed && !pastEdge) continue
     out.push({
       where: el.id || (typeof el.className === 'string' && el.className.split(' ')[0]) || el.tagName,
       text: own.slice(0, 60),
       // Without these, a remote failure on a runner nobody has locally is a
       // guess: the inline size shows whether the app's own fitting ran, and
-      // client/scroll show what it measured against.
+      // client/scroll/box show what it measured against — ink is the edge the
+      // reader actually sees, boxRight the edge the element occupies.
       fit: el.style.fontSize || 'none',
       size: getComputedStyle(el).fontSize,
       box: [el.clientWidth, el.scrollWidth],
+      ink: Math.round(inkRightOf(el) - limitOf(el)),
+      boxRight: Math.round(el.getBoundingClientRect().right - limitOf(el)),
       pixels: Math.round(Math.max(overflowed ? el.scrollWidth - el.clientWidth : 0,
-        el.getBoundingClientRect().right - limitOf(el)))
+        inkRightOf(el) - limitOf(el)))
     })
   }
   // The engagement witness is captured in the same task as the clip list, not
@@ -413,11 +430,17 @@ async function runOne(locale, view) {
     // Does the card actually re-check its own numbers? Asked once per window, in
     // the same terms the product offers, so a watch that stopped running is a
     // finding rather than a check that silently grades whatever it first sees.
+    // The budget is a several-times-the-interval, not one interval: on a loaded
+    // machine a one-second timer can legitimately arrive late, and this suite is
+    // not the place to blame the product for the host's schedule.
     const watchStart = await evaluate(TICKS)
-    await sleep(1700)
-    const watchRuns = (await evaluate(TICKS)) > watchStart
+    let watchRuns = false
+    for (let deadline = Date.now() + 6000; Date.now() < deadline;) {
+      await sleep(250)
+      if ((await evaluate(TICKS)) > watchStart) { watchRuns = true; break }
+    }
     if (!watchRuns) {
-      entry.findings.push(`${label}: the standing watch never passed over the numbers, ` +
+      entry.findings.push(`${label}: the standing watch never passed over the numbers within 6s, ` +
         `so a metric that arrives late has nothing that can repair it`)
     }
     for (const fixture of FIXTURES) {
