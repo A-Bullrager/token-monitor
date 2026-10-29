@@ -307,9 +307,10 @@ function setRunwayType(node, value, base, compact = false) {
 
 // A money slot laid out for ¥1.49 also has to survive ¥99,999,999.99, which is
 // three times the width. Rather than clip it or reflow the fixed instrument,
-// shrink the type until the text measurably fits the box that clips it, and
-// stop at a floor below which the number stops being readable.
-// Nodes are remembered so every later change to their text re-fits them.
+// shrink the type until the reader can see every digit — the ink inside the wall
+// it could hit — and stop at a floor below which the number stops being readable.
+// Nodes are remembered, with the options they were fitted with, so every later
+// change to their text re-fits them the same way.
 const fittedNodes = new Map()
 
 function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
@@ -326,11 +327,13 @@ function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   node.style.fontSize = ''
   const base = parseFloat(getComputedStyle(node).fontSize)
   if (!Number.isFinite(base)) return
-  // The box that actually clips this text. These values sit in flex rows that
-  // grow with their content, so comparing the element to itself would never
-  // notice: the overflow shows up as the element running past the nearest
-  // ancestor that is allowed to clip it.
-  const limit = () => {
+  // The right edge of the ink, and the wall the ink would run into — the nearest
+  // ancestor allowed to clip, or the first element that begins to the right of
+  // this one on the same line. Text that spills past its own slot while empty
+  // space follows it is not something the reader loses, and treating it as one had
+  // the fitter shrinking a German ledger line to 5.5px and a headline balance to
+  // half its designed size to move edges that no font size can move.
+  const limitRight = () => {
     for (let parent = node.parentElement; parent; parent = parent.parentElement) {
       const style = getComputedStyle(parent)
       if (style.overflowX === 'visible' && style.textOverflow !== 'ellipsis') continue
@@ -338,23 +341,31 @@ function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
     }
     return window.innerWidth
   }
-  const overflows = () => node.scrollWidth > node.clientWidth + 1 || inkRight() > limit() + 1
-  // The right edge of the *ink*, not of the box. These slots sit in flex rows that
-  // can be wider than the text they hold — on the Spanish deck a 226px box carried
-  // about 113px of glyphs — and a box that overhangs the clipping panel by a few
-  // pixels shows the reader nothing. Measuring the box made an unwinnable test: the
-  // fitter shrank the number toward its floor trying to move an edge that font size
-  // cannot move, and the card ended up printing the headline balance at 16.5px
-  // where it had fitted comfortably at 33px.
+  const ownRect = node.getBoundingClientRect()
+  const wallRight = () => {
+    let stop = limitRight()
+    for (let up = node; up && up !== document.body; up = up.parentElement) {
+      for (let sibling = up.nextElementSibling; sibling; sibling = sibling.nextElementSibling) {
+        const rect = sibling.getBoundingClientRect()
+        if (!rect.width || rect.top >= ownRect.bottom - 1 || rect.bottom <= ownRect.top + 1) continue
+        if (rect.left >= ownRect.right - 1) stop = Math.min(stop, rect.left)
+      }
+    }
+    return stop
+  }
   const inkRight = () => {
     const range = document.createRange()
     range.selectNodeContents(node)
     const rects = range.getClientRects()
-    if (!rects.length) return node.getBoundingClientRect().right
+    if (!rects.length) return ownRect.right
     let right = 0
     for (const rect of rects) right = Math.max(right, rect.right)
     return right
   }
+  const ownStyle = getComputedStyle(node)
+  const selfClips = ownStyle.overflowX !== 'visible' || ownStyle.textOverflow === 'ellipsis'
+  const overflows = () => (selfClips && node.scrollWidth > node.clientWidth + 1) ||
+    inkRight() > wallRight() + 1
   let scale = 1
   for (let step = 0; step < steps && overflows(); step++) {
     scale = Math.max(floor, scale - 0.12)

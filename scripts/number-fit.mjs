@@ -198,11 +198,12 @@ const MEASURE = `(() => {
     }
     return window.innerWidth
   }
-  // The right edge of the ink, matching what the card's own fitter measures: a
-  // flex slot can be wider than the digits inside it, and a box that overhangs the
-  // panel by a few pixels while its text ends far short of that edge hides nothing
-  // from the reader. Judging the box made the fitter chase an unreachable condition
-  // and shrink numbers it did not need to shrink.
+  // The same rule the card uses: measure the ink, and compare it to the wall the
+  // ink would actually hit — the nearest ancestor allowed to clip, or the first
+  // element beginning to the right on the same line. Spill into empty space is not
+  // something a reader loses, and asking for it made the product shrink numbers it
+  // never needed to shrink. Kept as a mirror of fitNumber() in app.js on purpose:
+  // if the two disagree, the check is grading a fiction.
   const inkRightOf = (el) => {
     const range = document.createRange()
     range.selectNodeContents(el)
@@ -212,28 +213,44 @@ const MEASURE = `(() => {
     for (const rect of rects) right = Math.max(right, rect.right)
     return right
   }
+  const wallRightOf = (el) => {
+    const own = el.getBoundingClientRect()
+    let stop = limitOf(el)
+    for (let up = el; up && up !== document.body; up = up.parentElement) {
+      for (let sibling = up.nextElementSibling; sibling; sibling = sibling.nextElementSibling) {
+        const rect = sibling.getBoundingClientRect()
+        if (!rect.width || rect.top >= own.bottom - 1 || rect.bottom <= own.top + 1) continue
+        if (rect.left >= own.right - 1) stop = Math.min(stop, rect.left)
+      }
+    }
+    return stop
+  }
+  const selfClips = (el) => {
+    const style = getComputedStyle(el)
+    return style.overflowX !== 'visible' || style.textOverflow === 'ellipsis'
+  }
   for (const el of document.querySelectorAll('body *')) {
     if (!visible(el) || el.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue
     const own = [...el.childNodes].filter((n) => n.nodeType === 3)
       .map((n) => n.nodeValue.trim()).join(' ').trim()
     if (!own) continue
-    const overflowed = el.scrollWidth > el.clientWidth + 1
-    const pastEdge = inkRightOf(el) > limitOf(el) + 1
-    if (!overflowed && !pastEdge) continue
+    const spill = selfClips(el) && el.scrollWidth > el.clientWidth + 1
+    const wall = wallRightOf(el)
+    const ink = inkRightOf(el)
+    const pastEdge = ink > wall + 1
+    if (!spill && !pastEdge) continue
     out.push({
       where: el.id || (typeof el.className === 'string' && el.className.split(' ')[0]) || el.tagName,
       text: own.slice(0, 60),
       // Without these, a remote failure on a runner nobody has locally is a
-      // guess: the inline size shows whether the app's own fitting ran, and
-      // client/scroll/box show what it measured against — ink is the edge the
-      // reader actually sees, boxRight the edge the element occupies.
+      // guess: the inline size shows whether the app's own fitting ran, box shows
+      // what it measured against, and ink/wall say what the reader actually loses.
       fit: el.style.fontSize || 'none',
       size: getComputedStyle(el).fontSize,
       box: [el.clientWidth, el.scrollWidth],
-      ink: Math.round(inkRightOf(el) - limitOf(el)),
-      boxRight: Math.round(el.getBoundingClientRect().right - limitOf(el)),
-      pixels: Math.round(Math.max(overflowed ? el.scrollWidth - el.clientWidth : 0,
-        inkRightOf(el) - limitOf(el)))
+      ink: Math.round(ink - wall),
+      clippedBySelf: spill,
+      pixels: Math.round(Math.max(spill ? el.scrollWidth - el.clientWidth : 0, ink - wall))
     })
   }
   // The engagement witness is captured in the same task as the clip list, not
