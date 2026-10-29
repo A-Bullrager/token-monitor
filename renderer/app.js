@@ -280,39 +280,26 @@ function setRunwayType(node, value, base, compact = false) {
   }
 }
 
-// A money slot laid out for ¥1.49 also has to survive ¥9,999,999.99, which is
+// A money slot laid out for ¥1.49 also has to survive ¥99,999,999.99, which is
 // three times the width. Rather than clip it or reflow the fixed instrument,
-// shrink the type until the text measurably fits — measured against the box
-// that actually clips it, so it works for every language and every digit
-// count — and stop at a floor below which the number stops being readable.
-// Nodes the app has fitted, so every later change to their text re-fits them.
-// A one-shot measurement at render time is not enough: the language mirror can
-// rewrite a label a few frames later, webfonts land after first paint, and a
-// machine that is slower at either would keep a size decided against metrics
-// that no longer apply.
+// shrink the type until the text measurably fits the box that clips it, and
+// stop at a floor below which the number stops being readable.
+// Nodes are remembered so every later change to their text re-fits them.
 const fittedNodes = new Set()
 
-function fitNumber(node, { floor = 0.7, steps = 4, waits = 30 } = {}) {
+function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   if (!node) return
   fittedNodes.add(node)
-  // No layout yet means every width below is zero and "it fits" is a lie. Ask
-  // again on the next frame instead of quietly deciding nothing is needed —
-  // this is exactly how a number can pass on one machine and overflow on
-  // another that paints later. Bounded, because a hidden form (the deck while
-  // the strip shows) legitimately has no width to wait for.
-  if (!node.clientWidth) {
-    if (waits > 0 && typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => fitNumber(node, { floor, steps, waits: waits - 1 }))
-    }
-    return
-  }
+  // Start from the stylesheet's size, or each pass would measure the last one's
+  // shrink and compound: 16px became 5.6px became 3.9px for a number that never
+  // needed shrinking at all.
   node.style.fontSize = ''
   const base = parseFloat(getComputedStyle(node).fontSize)
   if (!Number.isFinite(base)) return
-  // The box that actually clips this text. A flex item usually grows with its
-  // own content, so comparing the element to itself would never notice: the
-  // overflow shows up as the element running past the nearest ancestor that is
-  // allowed to clip it.
+  // The box that actually clips this text. These values sit in flex rows that
+  // grow with their content, so comparing the element to itself would never
+  // notice: the overflow shows up as the element running past the nearest
+  // ancestor that is allowed to clip it.
   const limit = () => {
     for (let parent = node.parentElement; parent; parent = parent.parentElement) {
       const style = getComputedStyle(parent)
@@ -323,12 +310,23 @@ function fitNumber(node, { floor = 0.7, steps = 4, waits = 30 } = {}) {
   }
   const overflows = () => node.scrollWidth > node.clientWidth + 1 ||
     node.getBoundingClientRect().right > limit() + 1
+  if (!node.clientWidth && !node.getClientRects().length) return // hidden form
   let scale = 1
   for (let step = 0; step < steps && overflows(); step++) {
     scale = Math.max(floor, scale - 0.12)
     node.style.fontSize = `${+(base * scale).toFixed(2)}px`
     if (scale === floor) break
   }
+}
+
+// A measurement is only valid against the metrics on screen, and those can
+// arrive late: macOS fitted ¥123,456.78 into its 78px slot, then resolved the
+// font and the same text became 99px wide. Re-measure after the page settles as
+// well as on render, so the decision ends up taken against real metrics.
+let settleTimers = []
+function scheduleSettle() {
+  for (const timer of settleTimers) clearTimeout(timer)
+  settleTimers = [250, 1000].map((delay) => setTimeout(refitNumbers, delay))
 }
 
 function setText(node, value) {
@@ -596,6 +594,7 @@ function renderSparkline(series) {
 }
 
 function renderStrip() {
+  scheduleSettle()
   const data = state.data
   const u = usage()
   const b = balance()
@@ -756,6 +755,7 @@ function updateGauge(runway) {
 }
 
 function renderDeck() {
+  scheduleSettle()
   const data = state.data
   const u = usage()
   const b = balance()

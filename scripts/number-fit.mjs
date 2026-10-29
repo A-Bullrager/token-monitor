@@ -326,11 +326,20 @@ async function runOne(locale, view) {
     await evaluate('(() => { window.__tmBaseline = JSON.parse(JSON.stringify(state.data)); return true })()')
     for (const fixture of FIXTURES) {
       await evaluate(APPLY(fixture.name, fixture.ops))
-      // Measure the settled page. Webfonts reflow text after the first paint,
-      // and a fit decided against the fallback metrics is the bug this check
-      // exists to catch — macOS reported exactly that as a phantom overflow.
+      // Measure the settled page, not a moment in it. The app re-fits after
+      // fonts land and after a short settle delay, because macOS resolves its
+      // system monospace later than first paint; reading too early would grade
+      // a state the product is about to correct — which is exactly the mistake
+      // the fitter itself made.
       await evaluate('document.fonts.ready.then(() => true)')
-      await sleep(120) // Let the language mirror settle after the re-render.
+      let clipped = []
+      for (let attempt = 0; attempt < 12; attempt++) {
+        await sleep(300)
+        const again = await evaluate(MEASURE)
+        const stable = JSON.stringify(again) === JSON.stringify(clipped)
+        clipped = again
+        if (stable && attempt >= 2) break
+      }
       // Prove the fitter actually ran, not just that the page looks fine: a
       // silent no-op on another platform would otherwise pass by luck until a
       // wider font made the same number overflow again.
@@ -375,14 +384,14 @@ async function runOne(locale, view) {
       if (fixture.name === 'demo baseline') {
         const shrunk = await evaluate(`(() => {
           const ids = ['stripToday', 'stripBalance', 'deckBalance', 'deckBalanceSub']
-          return ids.filter((id) => {
-            const node = document.getElementById(id)
-            return node && node.style.fontSize !== ''
-          })
+          return ids
+            .map((id) => [id, document.getElementById(id)])
+            .filter(([, node]) => node && node.style.fontSize !== '')
+            .map(([id, node]) => ({ id, size: node.style.fontSize, text: node.textContent.trim() }))
         })()`)
-        assert.deepEqual(shrunk, [], `${label}: the demo values already needed a font-size override`)
+        assert.deepEqual(shrunk, [],
+          `${label}: the demo values already needed a font-size override: ${JSON.stringify(shrunk)}`)
       }
-      const clipped = await evaluate(MEASURE)
       const widest = await evaluate(`(() => {
         const read = (id) => document.getElementById(id)?.textContent?.trim() || ''
         return { balance: read('deckBalance') || read('stripBalance'),
