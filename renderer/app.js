@@ -812,10 +812,12 @@ function renderDeck() {
   fitNumber(el.deckBalanceSub)
 
   el.deckToday.textContent = u ? money(u.today?.cost) : money(null)
+  fitNumber(el.deckToday)
   el.deckTodayTokens.textContent = u ? `${formatTokens(u.today?.tokens)} tokens` : '—'
   el.deckPace.textContent = pace.avg == null ? '—' : money(pace.avg)
   el.deckPaceCaption.textContent = u ? pace.shortLabel : '—'
   el.deckThirty.textContent = u ? money(u.last30?.cost) : money(null)
+  fitNumber(el.deckThirty)
   el.deckThirtySub.textContent = u
     ? `活跃 ${u.last30?.activeDays ?? 0} 天 · ${u.last30?.days ?? 30} 天窗口`
     : '—'
@@ -1812,6 +1814,10 @@ async function init() {
       renderStrip()
       renderDeck()
     }, () => {})
+    // The operating system applies a window resize on its own schedule, so the
+    // width a fit was decided against can change after the fact. Re-measure
+    // when the window settles rather than trusting the first pass.
+    window.addEventListener('resize', refitNumbers)
     if (AUTO_SETTINGS) {
       setTimeout(() => openSettings({ focus: false }), 420)
     }

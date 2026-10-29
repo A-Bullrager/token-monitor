@@ -337,17 +337,37 @@ async function runOne(locale, view) {
       if (fixture.name === 'millions') {
         const engaged = await evaluate(`(() => {
           const node = document.getElementById('stripToday')
+          if (!node) return { shown: false }
+          // The full chain, because the app's own fitter and this measurement
+          // disagree on one platform and only the geometry can say why.
+          const chain = []
+          for (let el = node; el && chain.length < 5; el = el.parentElement) {
+            const style = getComputedStyle(el)
+            const box = el.getBoundingClientRect()
+            chain.push({
+              el: el.id || (typeof el.className === 'string' && el.className.split(' ')[0]) || el.tagName,
+              ox: style.overflowX, to: style.textOverflow, ws: style.whiteSpace,
+              w: Math.round(box.width), right: Math.round(box.right)
+            })
+          }
           return {
-            shown: !!node && node.getClientRects().length > 0,
-            inline: node?.style.fontSize || '',
-            size: node ? getComputedStyle(node).fontSize : ''
+            shown: node.getClientRects().length > 0,
+            inline: node.style.fontSize || '',
+            size: getComputedStyle(node).fontSize,
+            client: node.clientWidth, scroll: node.scrollWidth,
+            // Distinguishes "the app never called its fitter" (function absent,
+            // or renderStrip returned early) from "it called it and concluded
+            // the text fits", which the two numbers above cannot tell apart.
+            hasFit: typeof fitNumber === 'function',
+            usage: !!(state.data && state.data.usage),
+            chain
           }
         })()`)
         // Only assert where the element is actually laid out: in the deck form
         // the strip is display:none, so fitting correctly does nothing there.
         if (engaged.shown) {
           assert.ok(engaged.inline !== '' && parseFloat(engaged.size) < 16,
-            `${label}: the ¥123,456.78 figure was never shrunk (inline ${JSON.stringify(engaged.inline)}, computed ${engaged.size})`)
+            `${label}: the ¥123,456.78 figure was never shrunk — ${JSON.stringify(engaged)}`)
         }
       }
       // Fitting must be invisible until it is needed: if the demo account
