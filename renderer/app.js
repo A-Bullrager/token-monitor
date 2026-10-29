@@ -865,10 +865,14 @@ function renderDeck() {
   if (el.currency) el.currency.textContent = currencySymbol()
   el.ledgerMoney?.classList.toggle('is-empty', !b)
   el.deckBalance.textContent = b ? plainMoney(b.total) : '—'
-  // The headline is the one place with room to give: at 60% of its own size it is
-  // still a large figure, and a runner whose font metrics run a little wider than
-  // this machine's needed exactly that much more.
-  fitNumber(el.deckBalance, { floor: 0.6 })
+  // The headline is the one place with room to give, and "room to give" turned
+  // out to mean more than one guess: at 60% of its 33px base the Spanish and
+  // English versions of ¥99,999,999.99 still measured six pixels past a 226px
+  // box on two runners. Six steps down to 50% — 16.5px, an ordinary interface
+  // size — leaves real margin instead of a coin toss between platforms, and the
+  // ladder still stops at the first size that fits, so nothing shrinks unless it
+  // has to.
+  fitNumber(el.deckBalance, { floor: 0.5, steps: 6 })
   setText(el.deckBalanceSub, b
     ? `充值 ${moneySummary(b.topup)} · 赠金 ${moneySummary(b.grant)}`
     : '尚未读取到余额')
