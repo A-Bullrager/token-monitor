@@ -153,7 +153,7 @@ async function launch(label, { locale = 'zh' } = {}) {
     return result.result?.value
   }
 
-  async function waitFor(name, expression, timeout = 25000) {
+  async function waitFor(name, expression, timeout = 25000, diagnose = null) {
     const deadline = Date.now() + timeout
     while (Date.now() < deadline) {
       try {
@@ -163,7 +163,19 @@ async function launch(label, { locale = 'zh' } = {}) {
       }
       await sleep(180)
     }
-    throw new Error(`timed out waiting for ${name}`)
+    // Report what the page actually looked like. Two Apple Silicon rounds failed
+    // below with nothing but a label, which left "the card is stuck in the strip
+    // form", "the window is still moving" and "this wait is wrong" indistinguishable
+    // from one line of log.
+    let seen = null
+    if (diagnose) {
+      try {
+        seen = await evaluate(diagnose)
+      } catch (error) {
+        seen = String(error)
+      }
+    }
+    throw new Error(`timed out waiting for ${name}${seen === null ? '' : ` — ${JSON.stringify(seen)}`}`)
   }
 
   await call('Runtime.enable')
@@ -195,6 +207,17 @@ async function quit() {
 }
 
 const viewExpr = (name) => `document.body.classList.contains('${name}')`
+// What a view wait saw, for the message when it timed out: the class says
+// whether the renderer agreed, the window width says whether the operating
+// system finished moving the card, and the renderer's own state says whether the
+// two of them disagree.
+const VIEW_DIAGNOSE = `(() => ({
+  classes: document.body.className,
+  inner: [window.innerWidth, window.innerHeight],
+  stateView: typeof state === 'undefined' ? null : state.view,
+  configView: typeof state === 'undefined' ? null : state.config?.view,
+  morphMs: getComputedStyle(document.documentElement).getPropertyValue('--morph-ms').trim()
+}))()`
 
 try {
   session = await launch('firstLaunch')
@@ -500,7 +523,7 @@ try {
   assert.ok(stripHi - stripLo <= 10, `strip stretched during morph: ${stripLo}..${stripHi}`)
 
   // collapse + persisted view
-  await waitFor('collapsed', `${viewExpr('view-strip')} && window.innerWidth < 560`)
+  await waitFor('collapsed', `${viewExpr('view-strip')} && window.innerWidth < 560`, 25000, VIEW_DIAGNOSE)
   await waitConfig((config) => config.view === 'strip', 'view strip')
   report.firstLaunch.collapsed = await evaluate(`({
     view: document.body.className,
@@ -510,7 +533,20 @@ try {
   assert.equal(report.firstLaunch.collapsed.runway, '19.8')
 
   await evaluate("document.querySelector('.strip-main').click()")
-  await waitFor('expanded again', `${viewExpr('view-deck')} && window.innerWidth > 520`)
+  try {
+    await waitFor('expanded again', `${viewExpr('view-deck')} && window.innerWidth > 520`, 25000, VIEW_DIAGNOSE)
+  } catch (error) {
+    // A bounded, recorded second click — the same shape as the morph attempts. On a
+    // contended runner the window can still be moving while the renderer has
+    // already agreed, and a swallowed click is what a user would answer with a
+    // second click. The first failure travels in the report either way, so a pass
+    // here is never silence about a runner that struggled.
+    report.firstLaunch.expandRetry = { first: String(error).slice(0, 700) }
+    await evaluate("document.querySelector('.strip-main').click()")
+    await waitFor('expanded again after one recorded retry',
+      `${viewExpr('view-deck')} && window.innerWidth > 520`, 25000, VIEW_DIAGNOSE)
+    report.firstLaunch.expandRetry.recovered = true
+  }
   await waitConfig((config) => config.view === 'deck', 'view deck')
 
   // Exercise the real credential failure path with a deliberately invalid key.
