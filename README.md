@@ -60,7 +60,7 @@ The two images below come from a live window rather than the staged showcase, as
 ## Download and run
 
 Releases: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Development builds are in the Artifacts of each Actions run.
-**[v2.6.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.0) is the current release** — the five-language build: Chinese, English, Spanish, Brazilian Portuguese and German. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and was extracted and launched on a real Windows 10 machine; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop.
+**[v2.6.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.1) is the current release** — the build that made the instrument survive an account far larger than the demo: five languages, both window forms, and every figure fitted to the box that actually clips it, re-checked after the platform finishes handing over its font metrics. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and GitHub's own asset digest, and was extracted and launched on a real Windows 10 machine reporting version 2.6.1 with `isPackaged`; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop.
 
 | Platform | Package | How to run it |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 16 language scenarios × 4 interface states pass, every collected character is inside the corpus, no label is clipped in any shipped language, and 10 number-fit runs × 10 magnitudes leave no number outside its box.
 
-**Twenty-three cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat. One of those negatives is about the tests themselves: the morph check was blind on macOS, where the window edge moves after the CSS class it sampled had already gone (round 12), so it now grades the observed motion instead.
+**Twenty-five cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat. One of those negatives is about the tests themselves: the morph check was blind on macOS, where the window edge moves after the CSS class it sampled had already gone (round 12), so it now grades the observed motion instead.
 
 <details>
 <summary>Cloud build history (rounds 1–13)</summary>
@@ -228,6 +228,9 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 **Round 22 (`d7e4253` — Windows, Linux and macOS Intel green; Apple Silicon red)**: the extreme fixture now documents the set of slots that may give out and fails only on one nobody listed, and still prints which one broke here and by how much. Apple Silicon failed a second consecutive time on one word — "timed out waiting for expanded again" — so view waits now report the body class, the window width and the renderer's own view state at the deadline, and the expand step gained one recorded retry in the shape the morph grading already used.
 **Round 23 (`7bb4591` — Windows, Linux and macOS Intel green; Apple Silicon red on one number)**: the view waits carried their new evidence and the expand did not fail again — no runner needed the recorded retry, and the report says so. What was left was a residual: the German breakdown line, compact by then, still measured 208px against a 202px box on Apple Silicon, six pixels past where its type floor allows. The currency sign left the compact form — the headline above it already carries one, and those two signs *were* the six pixels — and that micro line gained one more step of headroom.
+**Round 24 (`98a7693`, all four green)**: the six pixels turned out to be exactly the two currency signs they were, and the magnitude ladder — with the late metric injected every run — passed on Windows x64, Linux x64, macOS Apple Silicon and macOS Intel.
+
+**Round 25 (`v2.6.1` tag, run 40846036293)**: pushing the tag alone triggered the tag pipeline, all four runners passed, and the release job verified the six packages, generated `SHA256SUMS.txt` and published. The Windows package was re-downloaded from the release page, its SHA256 matched both the published list and GitHub's own asset digest, and it was extracted and launched here through the same assertions as any other build (`isPackaged`, version 2.6.1). The Linux and macOS packages are covered by their own runners only.
 </details>
 
 **What the macOS keychain really means in CI**: running from source probes `keychain` (the unsigned Electron entry is pre-authorized on the runner), while the **packaged app stays at `pending`** — the system never answers. The checks now accept and report that instead of hanging, but it means **real Keychain encryption in the packaged macOS app has never been verified anywhere**, and this README does not claim it has.
@@ -266,7 +269,7 @@ These checks do **not** prove complete cmap coverage, every fallback glyph, nati
 
 ## GitHub Actions and releases
 
-The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published three times — v2.4.1, v2.5.0 and v2.6.0.
+The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published four times — v2.4.1, v2.5.0, v2.6.0 and v2.6.1.
 A local `git commit` triggers nothing in the cloud; a push, a pull request or a manual run does. GitHub Packages is for npm / container registries and the like — this project distributes desktop binaries through Artifacts and Release assets.
 
 | Trigger | Behaviour |
@@ -301,7 +304,7 @@ A tag containing `-` (for example `v2.7.0-beta.1`) is published as a pre-release
 
 ```bash
 git push origin main          # first: let all four runners go green on the new commit
-git push origin v2.6.0        # then: push the tag alone, which is what triggers a Release
+git push origin v2.6.1        # then: push the tag alone, which is what triggers a Release
 ```
 
 GitHub documentation: [hosted runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

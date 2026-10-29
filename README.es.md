@@ -60,7 +60,7 @@ Las dos imágenes de abajo vienen de una ventana en ejecución real y no del esc
 ## Descarga y uso
 
 Lanzamientos: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Las compilaciones de desarrollo están en los Artifacts de cada ejecución de Actions.
-**[v2.6.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.0) es la versión actual** — la de cinco idiomas: chino, inglés, español, portugués de Brasil y alemán. Los cuatro runners nativos pasaron y la página lleva seis paquetes más `SHA256SUMS.txt`. El paquete de Windows se volvió a descargar de esa página, coincidió con su suma de verificación y se descomprimió y arrancó en un Windows 10 real; los paquetes de Linux y macOS solo los cubre su propio runner, no el escritorio del desarrollador.
+**[v2.6.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.1) es la versión actual** — la compilación que hizo que el instrumento sobreviviera a una cuenta mucho más grande que la de demostración: cinco idiomas, las dos formas de ventana y cada cifra ajustada a la caja que de verdad la recorta, revalidada después de que la plataforma entregue sus métricas de fuente. Los cuatro runners nativos pasaron y la página lleva seis paquetes más `SHA256SUMS.txt`. El paquete de Windows se volvió a descargar de esa página, coincidió con su suma de verificación y con el resumen del propio recurso de GitHub, y se descomprimió y arrancó en un Windows 10 real reportando la versión 2.6.1 con `isPackaged`; los paquetes de Linux y macOS solo los cubre su propio runner, no el escritorio del desarrollador.
 
 | Plataforma | Paquete | Cómo ejecutarlo |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ La interfaz está escrita en chino y cada otro idioma es un diccionario cuyas cl
 
 **Local (Windows 10 x64)**: pasan las pruebas de datos, 22 grupos de aserciones sobre backends de almacenamiento simulados, la paridad de diccionarios, la demanda de glifos, la interfaz desde el código, la compilación en directorio y una extracción y arranque reales del ZIP; pasan 16 escenarios de idioma × 4 estados de interfaz, cada carácter recogido está dentro del corpus y ninguna etiqueta queda recortada en ningún idioma incluido; en las 10 pasadas de ajuste numérico × 10 magnitudes tampoco se sale ningún número de su caja. fontTools se usó contra los cmap reales de los subconjuntos: todo carácter latino que los diccionarios pueden poner en pantalla está en el subconjunto de Inter, y todo carácter chino del conjunto de demanda está en uno de los dos paquetes.
 
-**Veintitrés rondas en la nube hasta ahora; la versión publicada está verde en los cuatro runners nativos.** El relato ronda a ronda está plegado abajo — todo lo que demostró algo *negativo* se dice fuera del pliegue, para que plegar no pueda ocultar una advertencia. Uno de esos negativos trata de las pruebas mismas: la comprobación de la deformación estaba ciega en macOS, donde el borde de la ventana se mueve después de que la clase CSS que medía ya había desaparecido (ronda 12), así que ahora califica el movimiento observado.
+**Veinticinco rondas en la nube hasta ahora; la versión publicada está verde en los cuatro runners nativos.** El relato ronda a ronda está plegado abajo — todo lo que demostró algo *negativo* se dice fuera del pliegue, para que plegar no pueda ocultar una advertencia. Uno de esos negativos trata de las pruebas mismas: la comprobación de la deformación estaba ciega en macOS, donde el borde de la ventana se mueve después de que la clase CSS que medía ya había desaparecido (ronda 12), así que ahora califica el movimiento observado.
 
 <details>
 <summary>Historial de compilaciones en la nube (rondas 1–13)</summary>
@@ -228,6 +228,9 @@ La interfaz está escrita en chino y cada otro idioma es un diccionario cuyas cl
 
 **Ronda 22 (`d7e4253` — Windows, Linux e macOS Intel verdes; Apple Silicon en rojo)**: la magnitud extrema ahora documenta el conjunto de huecos que pueden ceder y solo falla si cede uno que nadie enumeró, e igualmente imprime cuál cedió aquí y por cuántos píxeles. Apple Silicon volvió a caer una ronda consecutiva con una sola palabra — "timed out waiting for expanded again" — así que las esperas de vista reportan al vencer el plazo la clase del body, el ancho de la ventana y el estado de vista del propio renderizador, y el paso de expandir ganó un rebote registrado con la misma forma que ya usaba la calificación de la deformación.
 **Ronda 23 (`7bb4591` — Windows, Linux y macOS Intel verdes; Apple Silicon rojo por un número)**: las esperas de vista llevaron su nueva evidencia y el expandir no volvió a fallar — ningún runner necesitó el rebote registrado, y el reporte lo dice. Quedó un residuo: la línea de desglose en alemán, ya en notación compacta, siguió midiendo 208px contra una caja de 202px en Apple Silicon, seis píxeles por encima de su límite de tipo. El símbolo de moneda salió de la forma compacta — la cabecera de arriba ya lleva uno, y esos dos signos *eran* los seis píxeles — y esa microcelda ganó un paso más de margen.
+**Ronda 24 (`98a7693`, los cuatro verdes)**: los seis píxeles resultaron ser exactamente los dos símbolos de moneda que eran, y la escalera de magnitudes —con la métrica tardía inyectada en cada ejecución— pasó en Windows x64, Linux x64, macOS Apple Silicon y macOS Intel.
+
+**Ronda 25 (etiqueta `v2.6.1`, ejecución 40846036293)**: empujar la etiqueta sola activó el pipeline de etiqueta, los cuatro runners pasaron y el trabajo de lanzamiento verificó los seis paquetes, generó `SHA256SUMS.txt` y publicó. El paquete de Windows se volvió a descargar de la página del lanzamiento, su SHA256 coincidió con la lista publicada y con el digest del propio recurso de GitHub, y se extrajo y arrancó aquí con las mismas aserciones que cualquier otra compilación (`isPackaged`, versión 2.6.1). Los paquetes de Linux y macOS los cubre solo su propio runner.
 </details>
 
 **Qué significa de verdad el llavero de macOS en CI**: ejecutar desde el código sondea `keychain` (la entrada de Electron sin firmar viene autorizada de fábrica en el runner), mientras que **la app empaquetada se queda en `pending`** — el sistema nunca responde. Las comprobaciones ahora aceptan y reportan eso en lugar de colgarse, pero significa que **el cifrado real del llavero en la app empaquetada de macOS no se ha verificado en ninguna parte**, y este README no afirma que sí.
@@ -301,7 +304,7 @@ Una etiqueta con `-` (por ejemplo `v2.7.0-beta.1`) se publica como pre-lanzamien
 
 ```bash
 git push origin main          # primero: deja que los cuatro runners se pongan verdes con el commit nuevo
-git push origin v2.6.0        # después: empuja la etiqueta sola, que es lo que dispara una Release
+git push origin v2.6.1        # después: empuja la etiqueta sola, que es lo que dispara una Release
 ```
 
 Documentación de GitHub: [runners alojados](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [eventos que disparan flujos de trabajo](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

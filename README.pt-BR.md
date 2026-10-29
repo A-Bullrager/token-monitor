@@ -60,7 +60,7 @@ As duas imagens abaixo vêm de uma janela real em execução, não da vitrine en
 ## Baixar e executar
 
 Lançamentos: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Compilações de desenvolvimento estão nos Artifacts de cada execução do Actions.
-**[v2.6.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.0) é a versão atual** — a de cinco idiomas: chinês, inglês, espanhol, português do Brasil e alemão. Os quatro runners nativos passaram, e a página traz seis pacotes mais `SHA256SUMS.txt`. O pacote do Windows foi baixado de novo daquela página, bateu com a soma de verificação e foi extraído e iniciado em um Windows 10 de verdade; os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners, não pela máquina do desenvolvedor.
+**[v2.6.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.1) é a versão atual** — a compilação que fez o instrumento sobreviver a uma conta bem maior que a de demonstração: cinco idiomas, as duas formas de janela, e cada número ajustado à caixa que de fato o recorta, reconfirmado depois que a plataforma entrega as métricas da fonte. Os quatro runners nativos passaram, e a página traz seis pacotes mais `SHA256SUMS.txt`. O pacote do Windows foi baixado de novo daquela página, bateu com a soma de verificação e com o resumo do próprio recurso do GitHub, e foi extraído e iniciado em um Windows 10 de verdade reportando versão 2.6.1 com `isPackaged`; os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners, não pela máquina do desenvolvedor.
 
 | Plataforma | Pacote | Como executar |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ A interface é escrita em chinês, e cada outro idioma é um dicionário cujas c
 
 nenhum rótulo fica cortado em nenhum idioma incluído; nas 10 passadas de caimento de número × 10 escalas de magnitude também nenhum número sai da caixa.
 
-**Vinte e três rodadas na nuvem até aqui; a versão publicada está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva. Um daqueles negativos é sobre os próprios testes: a checagem da deformação estava cega no macOS, onde a borda da janela se move depois que a classe CSS que ela amostrava já tinha sumido (rodada 12), então agora ela avalia o movimento observado.
+**Vinte e cinco rodadas na nuvem até aqui; a versão publicada está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva. Um daqueles negativos é sobre os próprios testes: a checagem da deformação estava cega no macOS, onde a borda da janela se move depois que a classe CSS que ela amostrava já tinha sumido (rodada 12), então agora ela avalia o movimento observado.
 
 <details>
 <summary>Histórico de compilações na nuvem (rodadas 1–13)</summary>
@@ -228,6 +228,9 @@ nenhum rótulo fica cortado em nenhum idioma incluído; nas 10 passadas de caime
 
 **Rodada 22 (`d7e4253` — Windows, Linux e macOS Intel verdes; Apple Silicon vermelho)**: a grandeza extrema agora documenta o conjunto de espaços que podem ceder e só falha se ceder um que ninguém listou, e continua imprimindo qual cedeu aqui e por quantos pixels. O Apple Silicon falhou pela segunda rodada seguida numa única palavra — "timed out waiting for expanded again" — então as esperas de vista reportam no vencimento a classe do body, a largura da janela e o próprio estado de vista do renderizador, e o passo de expandir ganhou uma tentativa registrada, na mesma forma que a avaliação da deformação já usava.
 **Rodada 23 (`7bb4591` — Windows, Linux e macOS Intel verdes; Apple Silicon vermelho por um número)**: as esperas de vista trouxeram sua nova evidência, e o expandir não falhou de novo — nenhum runner precisou da tentativa registrada, e o relatório diz isso. Sobrou um resíduo: a linha de composição em alemão, já em notação compacta, continuou medindo 208px contra uma caixa de 202px no Apple Silicon, seis pixels acima do limite de corpo. O símbolo de moeda saiu da forma compacta — o total logo acima já traz um, e esses dois sinais *eram* os seis pixels — e aquela microcélula ganhou mais um passo de folga.
+**Rodada 24 (`98a7693`, os quatro verdes)**: os seis pixels eram exatamente os dois símbolos de moeda que eram, e a escada de magnitudes — com a métrica tardia injetada em cada execução — passou em Windows x64, Linux x64, macOS Apple Silicon e macOS Intel.
+
+**Rodada 25 (tag `v2.6.1`, execução 40846036293)**: enviar a tag sozinha ativou o pipeline de tag, os quatro runners passaram e o job de lançamento conferiu os seis pacotes, gerou `SHA256SUMS.txt` e publicou. O pacote do Windows foi baixado de novo da página do lançamento, seu SHA256 bateu com a lista publicada e com o resumo do próprio recurso do GitHub, e ele foi extraído e iniciado aqui pelas mesmas asserções de qualquer outra compilação (`isPackaged`, versão 2.6.1). Os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners.
 </details>
 
 **O que o chaveiro do macOS realmente significa no CI**: rodar pelo código sonda `keychain` (a entrada do Electron não assinado vem pré-autorizada no runner), enquanto **o app empacotado fica em `pending`** — o sistema nunca responde. As checagens agora aceitam e relatam isso em vez de travar, mas isso significa que **a criptografia real do Chaveiro no app empacotado do macOS nunca foi verificada em lugar nenhum**, e este README não afirma que foi.
@@ -301,7 +304,7 @@ Uma tag com `-` (por exemplo `v2.7.0-beta.1`) é publicada como pré-lançamento
 
 ```bash
 git push origin main          # primeiro: deixe os quatro runners ficarem verdes no commit novo
-git push origin v2.6.0        # depois: envie a tag sozinha, que é o que dispara uma Release
+git push origin v2.6.1        # depois: envie a tag sozinha, que é o que dispara uma Release
 ```
 
 Documentação do GitHub: [runners hospedados](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [eventos que disparam fluxos de trabalho](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

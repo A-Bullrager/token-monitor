@@ -60,7 +60,7 @@
 ## 下载与运行
 
 发布后可从 [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases) 下载；开发构建在 Actions 运行页的 Artifacts 中。
-**当前发布的是 [v2.6.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.0)** —— 五种语言那一版：中文、英文、西班牙语、巴西葡萄牙语、德语。四个原生 runner 全部通过，发布页附了六件程序包与 `SHA256SUMS.txt`。Windows 包已从发布页原件重新下载，哈希与清单一致，并在本机解包启动通过全部断言；Linux 与 macOS 包只由各自 runner 的解包 / 安装校验覆盖，没有在开发者真机上复验。
+**当前发布的是 [v2.6.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.1)** —— 让这套仪器扛住远大于演示账户的那一版：五种语言、两种形态，每个数字都按真正裁剪它的盒子来适配，并在平台把字体度量交齐之后再复检一次。四个原生 runner 全部通过，发布页附了六件程序包与 `SHA256SUMS.txt`。Windows 包已从发布页原件重新下载，哈希与清单、以及 GitHub 自己的资源摘要都一致，并在本机解包启动、以 `isPackaged` 与版本 2.6.1 通过全部断言；Linux 与 macOS 包只由各自 runner 的解包 / 安装校验覆盖，没有在开发者真机上复验。
 
 | 平台 | 程序包 | 使用方式 |
 | --- | --- | --- |
@@ -187,7 +187,7 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 **本地验证（Windows 10 x64）：** 数据测试、22 组模拟存储后端断言、词典一致性、字形需求检查、源码 UI、便携目录和实际 ZIP 解包启动均通过；16 个语言场景 × 4 个界面状态全部通过，翻译模式下屏幕上的中文字符数为 0，采集字符均在语料内，没有任何一种语言的标签被裁掉；数字适配 10 组 × 10 档数量级也没有一个数字越出盒子。另用 fontTools 对照真实子集 cmap：词典能放上屏幕的拉丁字符都在 Inter 子集里，需求集里的汉字至少命中一个随包字体。
 
-**云端共二十三轮，当前发布版本在四个原生 runner 上全绿。** 逐轮过程折叠在下面；折叠里只放过程叙述，能被证明「不成立」的结论一律留在折叠外面。其中一条负面结论是关于测试本身的：形变检查在 macOS 上是瞎的——窗口边缘动的时候，它采样依据的 CSS 类早已移除（第十二轮），所以现在改为按实际观测到的运动评级。
+**云端共二十五轮，当前发布版本在四个原生 runner 上全绿。** 逐轮过程折叠在下面；折叠里只放过程叙述，能被证明「不成立」的结论一律留在折叠外面。其中一条负面结论是关于测试本身的：形变检查在 macOS 上是瞎的——窗口边缘动的时候，它采样依据的 CSS 类早已移除（第十二轮），所以现在改为按实际观测到的运动评级。
 
 <details>
 <summary>云端构建记录（第 1–13 轮）</summary>
@@ -229,6 +229,9 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 **第二十二轮（`d7e4253`——Windows、Linux、macOS Intel 绿，Apple Silicon 红）**：极端档位现在记录的是「允许崩掉的那组格子」，只有出现清单之外的崩溃才失败，并且照样打印这台机器上到底哪个崩了、崩出多少像素。Apple Silicon 连续第二轮卡在一个词上——"timed out waiting for expanded again"——于是所有等视图的地方开始报告超时那一刻的 body 类名、窗口宽度与渲染层自己的视图状态，展开这一步也加了一次有记录的重试，形态与形变评级已经在用的那套相同。
 **第二十三轮（`7bb4591`——Windows、Linux、macOS Intel 绿；Apple Silicon 因一个数字红）**：等视图的地方带上了新的现场证据，而那次展开没有再失败——四个 runner 都没用到那次有记录的重试，报告里也写得出来。剩下的是一处残余：德语余额构成行即便已经改用紧凑记法，在 Apple Silicon 上仍量出 208px 对 202px 的盒子，比它的字号下限多出六个像素。于是紧凑写法里去掉了货币符号——它上方的总额行本来就带一个，而那六个像素恰好就是那两个符号——这条微标签行也多得一级缩放余量。
+**第二十四轮（`98a7693`，四个全绿）**：那六个像素果然就是那两个货币符号；带上「每轮注入迟到度量」的数量级阶梯，在 Windows x64、Linux x64、macOS Apple Silicon 与 macOS Intel 上全部通过。
+
+**第二十五轮（`v2.6.1` 标签，run 40846036293）**：单独推标签触发 tag 流水线，四个 runner 全绿，Release job 校验六件程序包、生成 `SHA256SUMS.txt` 并发布。从发布页重新下载的 Windows 包 SHA256 与清单、以及 GitHub 自己的资源摘要都一致，并在本机走了解包启动与全部断言（`isPackaged`、版本 2.6.1）；Linux 与 macOS 包只有各自 runner 的覆盖。
 </details>
 
 **macOS 钥匙串在 CI 的真实结论：** 源码运行探测到 `keychain`（未签名 Electron 的条目在 runner 上已授权），而**打包应用始终停在 `pending`**——系统不回答。现在的检查把这作为已报告的结果接受（应用照常启动、渲染、通过全部界面断言），不再因此挂死；但这意味着**打包版 macOS 的真实钥匙串加密仍未被任何环境验证过**，README 不把它当作已验证。
@@ -268,7 +271,7 @@ token 数量的分组与紧凑记数按语言走（`1096 万` / `11M` / `11 M` /
 
 ## GitHub Actions 与发布
 
-工作流见 [`.github/workflows/build.yml`](.github/workflows/build.yml)。四个 runner 都跑过真实构建，Release 路径也已经发布过三次——v2.4.1、v2.5.0、v2.6.0。
+工作流见 [`.github/workflows/build.yml`](.github/workflows/build.yml)。四个 runner 都跑过真实构建，Release 路径也已经发布过四次——v2.4.1、v2.5.0、v2.6.0、v2.6.1。
 本地 `git commit` 不会触发云端任务；需要 push、PR 或手动触发。GitHub Packages 面向 npm / 容器等包仓库，本项目的桌面程序使用 Artifacts 和 Release 附件分发。
 
 | 触发方式 | 行为 |
@@ -299,7 +302,7 @@ tag 带 `-`（例如 `v2.7.0-beta.1`）会标为预发布；普通版本 tag 发
 3. 无需配置 PAT：Release job 已声明 `contents: write`，使用自带的 `GITHUB_TOKEN`；组织策略仍可能限制执行或授权。
 4. 用户明确确认后才提交 / 推送。云端结果以实际运行为准，不把本地修改当作已上线。
 
-git push origin v2.6.0        # 第二步：单独推 tag，才会触发 Release 流程
+git push origin v2.6.1        # 第二步：单独推 tag，才会触发 Release 流程
 
 ```bash
 git push origin main          # 第一步：让四个 runner 先在新提交上跑绿

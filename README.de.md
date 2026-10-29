@@ -60,7 +60,7 @@ Die beiden Bilder unten kommen aus einem echten Fenster statt aus der gestellten
 ## Herunterladen und ausführen
 
 Veröffentlichungen: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Entwicklungsbauten liegen in den Artifacts jedes Actions-Laufs.
-**[v2.6.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.0) ist die aktuelle Veröffentlichung** — der Fünf-Sprachen-Bau: Chinesisch, Englisch, Spanisch, Brasilianisch-Portugiesisch und Deutsch. Alle vier nativen Runner waren grün, und die Seite trägt sechs Pakete plus `SHA256SUMS.txt`. Das Windows-Paket wurde von dieser Seite neu heruntergeladen, hat zur Prüfsumme gepasst und wurde auf einem echten Windows-10-Rechner entpackt und gestartet; die Pakete für Linux und macOS decken nur ihre eigenen Runner ab, nicht den Rechner des Entwicklers.
+**[v2.6.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.1) ist die aktuelle Veröffentlichung** — der Bau, bei dem das Instrument ein viel größeres Konto als das Demo-Konto übersteht: fünf Sprachen, beide Fensterformen, und jede Zahl an der Box ausgerichtet, die sie tatsächlich schneidet, nachgeprüft, sobald die Plattform ihre Font-Metriken geliefert hat. Alle vier nativen Runner waren grün, und die Seite trägt sechs Pakete plus `SHA256SUMS.txt`. Das Windows-Paket wurde von dieser Seite neu heruntergeladen, passte zur Prüfsumme und zum Asset-Digest von GitHub selbst, und wurde auf einem echten Windows-10-Rechner entpackt und gestartet, wo es Version 2.6.1 mit `isPackaged` meldete; die Pakete für Linux und macOS decken nur ihre eigenen Runner ab, nicht den Rechner des Entwicklers.
 
 | Plattform | Paket | So startest du es |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ Die Oberfläche ist auf Chinesisch geschrieben, und jede andere Sprache ist ein 
 
 **Lokal (Windows 10 x64)**: Datentests, 22 Gruppen von Storage-Backend-Assertions mit simulierten Backends, Wörterbuch-Parität, Glyph-Bedarf, Oberfläche aus dem Quellcode, Verzeichnisbau und ein echtes ZIP-Entpacken und Starten sind grün; 16 Sprach-Szenarien × 4 Oberflächenzustände sind grün, jedes gesammelte Zeichen liegt im Korpus, und in keiner mitgelieferten Sprache wird ein Label abgeschnitten; in den 10 Zahlen-Passungen × 10 Größenordnungen läuft ebenfalls keine Zahl aus ihrer Box. fontTools wurde gegen die echten Subset-cmaps eingesetzt — jedes lateinische Zeichen, das die Wörterbücher auf den Schirm bringen können, sitzt im Inter-Subset, und jedes chinesische Zeichen im Bedarfsatz sitzt in einem der beiden Pakete.
 
-**Dreiundzwanzig Cloud-Runden bisher; die aktuelle Veröffentlichung ist auf allen vier nativen Runnern grün.** Die Erzählung Runde für Runde ist unten eingeklappt — alles, was sie *negativ* belegt hat, steht außerhalb der Klappung, damit Einklappen keine Einschränkung verstecken kann. Eine dieser negativen Aussagen betrifft die Tests selbst: die Morph-Prüfung war auf macOS blind, weil dort die Fensterkante erst nach dem Verschwinden der CSS-Klasse wandert, die sie bemaß (Runde 12) — sie bewertet jetzt die tatsächlich beobachtete Bewegung.
+**Fünfundzwanzig Cloud-Runden bisher; die aktuelle Veröffentlichung ist auf allen vier nativen Runnern grün.** Die Erzählung Runde für Runde ist unten eingeklappt — alles, was sie *negativ* belegt hat, steht außerhalb der Klappung, damit Einklappen keine Einschränkung verstecken kann. Eine dieser negativen Aussagen betrifft die Tests selbst: die Morph-Prüfung war auf macOS blind, weil dort die Fensterkante erst nach dem Verschwinden der CSS-Klasse wandert, die sie bemaß (Runde 12) — sie bewertet jetzt die tatsächlich beobachtete Bewegung.
 
 <details>
 <summary>Cloud-Baugeschichte (Runden 1–13)</summary>
@@ -228,6 +228,9 @@ Die Oberfläche ist auf Chinesisch geschrieben, und jede andere Sprache ist ein 
 
 **Runde 22 (`d7e4253` — Windows, Linux und macOS Intel grün; Apple Silicon rot)**: die Extremgröße dokumentiert jetzt die Menge der Felder, die nachgeben dürfen, und scheitert nur an einem, den niemand aufgelistet hat; ausgedruckt wird weiterhin, welches hier nachgab und um wie viele Pixel. Apple Silicon scheiterte zum zweiten Mal in Folge an einem einzigen Wort — "timed out waiting for expanded again" —, also melden die Ansichts-Waits beim Ablauf die body-Klasse, die Fensterbreite und den eigenen Ansichtszustand des Renderers, und der Expandierschritt bekam einen protokollierten Wiederholungsversuch in genau der Form, die die Morph-Bewertung schon nutzte.
 **Runde 23 (`7bb4591` — Windows, Linux und macOS Intel grün; Apple Silicon an einer Zahl rot)**: die Ansichts-Waits trugen ihre neue Evidenz, und das Expandieren scheiterte kein drittes Mal — keiner der Runner brauchte den protokollierten Wiederholungsversuch, und der Report sagt das. Übrig blieb ein Rest: die deutsche Aufstellungsszeile maß, trotz kompakter Schreibweise, auf Apple Silicon 208px in einem 202px-Feld, sechs Pixel über ihrem Schrift-Floor. Das Währungszeichen verließ die kompakte Form — die Kopfzeile darüber trägt es schon, und genau diese zwei Zeichen *waren* die sechs Pixel —, und die Mikrozelle bekam eine weitere Stufe Reserve.
+**Runde 24 (`98a7693`, alle vier grün)**: die sechs Pixel waren genau die zwei Währungszeichen, die sie waren, und die Größenordnungs-Leiter — mit dem verspäteten Metrik-Einschub in jedem Lauf — bestand auf Windows x64, Linux x64, macOS Apple Silicon und macOS Intel.
+
+**Runde 25 (`v2.6.1`-Tag, Lauf 40846036293)**: den Tag allein zu pushen löste die Tag-Pipeline aus, alle vier Runner bestanden, und der Release-Job verifizierte die sechs Pakete, erzeugte `SHA256SUMS.txt` und veröffentlichte. Das Windows-Paket wurde von der Release-Seite neu geladen, seine SHA256 passte zur Liste und zum Asset-Digest von GitHub selbst, und es wurde hier über dieselben Assertions wie jeder andere Build entpackt und gestartet (`isPackaged`, Version 2.6.1). Linux und macOS decken nur ihre eigenen Runner ab.
 </details>
 
 **Was der macOS-Schlüsselbund in CI wirklich bedeutet**: aus dem Quellcode zu laufen prüft `keychain` (der Eintrag des unsignierten Electron ist auf dem Runner vorautorisiert), während die **gepackte App bei `pending` bleibt** — das System antwortet nie. Die Prüfungen akzeptieren und melden das inzwischen, statt zu hängen, aber das heißt: **die echte Schlüsselbund-Verschlüsselung der gepackten macOS-App wurde nirgends verifiziert**, und dieses README behauptet nicht, dass sie es wurde.
@@ -301,7 +304,7 @@ Ein Tag mit `-` (zum Beispiel `v2.7.0-beta.1`) wird als Pre-Release veröffentli
 
 ```bash
 git push origin main          # zuerst: alle vier Runner auf dem neuen Commit grün werden lassen
-git push origin v2.6.0        # danach: den Tag allein pushen, das ist der Release-Auslöser
+git push origin v2.6.1        # danach: den Tag allein pushen, das ist der Release-Auslöser
 ```
 
 GitHub-Dokumentation: [gehostete Runner](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [Events, die Workflows auslösen](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
