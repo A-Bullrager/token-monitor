@@ -404,10 +404,12 @@ async function runScenario(scenario) {
     }
     const capture = async (state) => {
       await evaluate('document.fonts.ready.then(() => true)')
-      // Grade labels only after the instrument stops re-fitting its own numbers.
-      // Judging inside that window measures a page still correcting itself, which
-      // is how a red run can be the checker's timing rather than the product's.
-      await waitFor("document.documentElement.dataset.numbersSettled === 'settled'", 'number settle')
+      // No wait for the number settle window here, deliberately: this check
+      // grades labels and translations against the demo account, whose figures
+      // never need fitting, and a longer pause between boot and the first read
+      // only widens the window in which something outside the test — a tray
+      // click on a developer's own desktop — can move the card off the state the
+      // scenario is about to assert. Fitted numbers are number-fit's business.
       const data = await evaluate(COLLECT)
       entry.states[state] = data
       await shoot(`${scenario.name}-${state}.png`)

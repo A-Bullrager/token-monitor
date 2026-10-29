@@ -120,6 +120,7 @@ jobs:
           name: diagnostics-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             shots/ui-report.json
+            shots/numbers-report.json
             shots/i18n/*.json
             shots/i18n/*.png
             shots/packaged/**

@@ -25,6 +25,17 @@ const keepShots = process.argv.includes('--keep-shots') || process.argv.includes
 // --only=<locale> and --all-shots exist for looking at one language's worst
 // case: a measurement that passes can still produce numbers too small to read.
 const only = (process.argv.find((arg) => arg.startsWith('--only=')) || '').split('=')[1]
+// Two controls for the waiting contract, kept because the CI failure they model
+// cost six rounds to find. The late metric is applied by default, on the theory
+// that a repair path only gets exercised where the suite always runs it: after
+// the card has fitted ¥123,456.78, the width of the same text is changed with no
+// render and no resize to announce it — the state CI reached on its own — and the
+// pass is graded only once the card has re-checked it. --no-late-metrics turns
+// that off; --freeze-watch stops the card re-checking at all, which must make the
+// check refuse to grade, proving the repair is the product's and not the
+// harness's.
+const lateMetrics = !process.argv.includes('--no-late-metrics')
+const freezeWatch = process.argv.includes('--freeze-watch')
 const shotDir = keepShots
   ? path.join(root, 'shots', 'numbers')
   : fs.mkdtempSync(path.join(os.tmpdir(), 'token-monitor-numbers-'))
@@ -203,8 +214,64 @@ const MEASURE = `(() => {
         el.getBoundingClientRect().right - limitOf(el)))
     })
   }
-  return out
+  // The engagement witness is captured in the same task as the clip list, not
+  // in a second read after it: a later read can describe a different instant,
+  // and CI proved that is how a check reports "clean page, number never shrunk"
+  // for a card whose metrics moved between the two.
+  const node = document.getElementById('stripToday')
+  const chain = []
+  if (node) {
+    for (let walk = node; walk && chain.length < 5; walk = walk.parentElement) {
+      const style = getComputedStyle(walk)
+      const rect = walk.getBoundingClientRect()
+      chain.push({
+        el: walk.id || (typeof walk.className === 'string' && walk.className.split(' ')[0]) || walk.tagName,
+        ox: style.overflowX, to: style.textOverflow, ws: style.whiteSpace,
+        w: Math.round(rect.width), right: Math.round(rect.right)
+      })
+    }
+  }
+  return {
+    clipped: out,
+    // Fitting must stay invisible until it is needed, so the demo account's own
+    // overrides are read here rather than in a later pass: same instant, same
+    // answer. The witness is the inline attribute, not the used size — several
+    // of these slots are 10px and 8.5px in the stylesheet.
+    overrides: ['stripToday', 'stripBalance', 'deckBalance', 'deckBalanceSub']
+      .map((id) => {
+        const item = document.getElementById(id)
+        return item && item.style.fontSize !== ''
+          ? { id, size: item.style.fontSize, text: item.textContent.trim() }
+          : null
+      }).filter(Boolean),
+    today: node ? {
+      shown: node.getClientRects().length > 0,
+      text: node.textContent.trim(),
+      inline: node.style.fontSize || '',
+      size: getComputedStyle(node).fontSize,
+      client: node.clientWidth, scroll: node.scrollWidth,
+      // Distinguishes "the app never called its fitter" (function absent, or
+      // renderStrip returned early) from "it called it and concluded the text
+      // fits", which the two numbers above cannot tell apart.
+      hasFit: typeof fitNumber === 'function',
+      // Whether the node the app caches is the node in the document, and what
+      // the fitter's own set holds: a detached clone would explain a fit that
+      // lands on a number nobody can see.
+      cached: el.stripToday === node, cachedConnected: Boolean(el.stripToday?.isConnected),
+      fitted: [...(typeof fittedNodes === 'undefined' ? [] : fittedNodes)]
+        .filter((item) => item.id)
+        .map((item) => item.id + ':' + (item.isConnected ? 'live' : 'detached')),
+      ticks: document.documentElement.dataset.numberWatchTicks || '0',
+      usage: !!(state.data && state.data.usage),
+      chain
+    } : { shown: false }
+  }
 })()`
+
+// How many times the card's standing watch has passed over the numbers. The
+// check's waiting contract is expressed in this counter rather than in seconds,
+// because the product owns the schedule and this machine may not.
+const TICKS = 'Number(document.documentElement.dataset.numberWatchTicks || 0)'
 
 // Apply the fixture through the app's own code path, then render.
 const APPLY = (name, ops) => `(() => {
@@ -246,7 +313,7 @@ async function runOne(locale, view) {
   for (const stream of [child.stdout, child.stderr]) {
     stream.on('data', (chunk) => { output = (output + String(chunk)).slice(-16000) })
   }
-  const entry = { label, locale, view, fixtures: {} }
+  const entry = { label, locale, view, fixtures: {}, findings: [] }
   results.push(entry)
   let ws = null
   let nextId = 1
@@ -324,76 +391,84 @@ async function runOne(locale, view) {
       await sleep(150)
     }
     await evaluate('(() => { window.__tmBaseline = JSON.parse(JSON.stringify(state.data)); return true })()')
+    if (freezeWatch) {
+      await evaluate('(() => { clearInterval(numberWatch); numberWatch = null; return true })()')
+    }
+    // Does the card actually re-check its own numbers? Asked once per window, in
+    // the same terms the product offers, so a watch that stopped running is a
+    // finding rather than a check that silently grades whatever it first sees.
+    const watchStart = await evaluate(TICKS)
+    await sleep(1700)
+    const watchRuns = (await evaluate(TICKS)) > watchStart
+    if (!watchRuns) {
+      entry.findings.push(`${label}: the standing watch never passed over the numbers, ` +
+        `so a metric that arrives late has nothing that can repair it`)
+    }
     for (const fixture of FIXTURES) {
       await evaluate(APPLY(fixture.name, fixture.ops))
-      // Measure the settled page, not a moment in it. Two signals say the page
-      // is done: its settle passes are over, and its standing watch has taken a
-      // pass that covers this change. The watch is the one that matters — on CI
-      // the box was already final when the card last fitted it, and the width of
-      // the same text changed after that, so grading the first stable reading
-      // judged a state the product had not yet re-checked.
-      await evaluate('document.fonts.ready.then(() => true)')
-      const ticksAtApply = await evaluate('Number(document.documentElement.dataset.numberWatchTicks || 0)')
-      const readyAfterThisChange = `document.documentElement.dataset.numbersSettled === 'settled' &&
-        Number(document.documentElement.dataset.numberWatchTicks || 0) > ${ticksAtApply}`
-      let clipped = []
-      let observedSettled = false
-      const settleDeadline = Date.now() + 20000
-      while (Date.now() < settleDeadline) {
-        await sleep(150)
-        if (!await evaluate(readyAfterThisChange)) {
-          clipped = []
-          continue
-        }
-        const again = await evaluate(MEASURE)
-        observedSettled = true
-        if (JSON.stringify(again) === JSON.stringify(clipped)) { clipped = again; break }
-        clipped = again
+      if (lateMetrics && fixture.name === 'millions') {
+        // The metric moves after the decision, with no render and no resize to
+        // announce it — the state CI reached on its own. Mild on purpose: this
+        // must be a shift the card can absorb, not a new way to hit the floor,
+        // and it is removed again so only this fixture is measured against it.
+        await evaluate(`(() => {
+          const style = document.createElement('style')
+          style.id = 'late-metrics'
+          style.textContent = '.today-value { letter-spacing: 0.03em; }'
+          document.head.appendChild(style)
+          return true
+        })()`)
       }
-      assert(observedSettled,
-        `${label} @ ${fixture.name}: the card never re-checked this state, so its numbers were never graded`)
+      // The card re-checks its own numbers once a second, and CI proved that a
+      // fit decided before its metrics are final is silently wrong afterwards.
+      // So the waiting contract is the product's, not a guessed delay: settle
+      // passes over, then the standing watch has passed over *this* state. A
+      // clean reading after one pass is a verdict; an overflowing one is not,
+      // because the next pass may be the repair — three passes say the overflow
+      // is what the product settled on, which is also how the documented limit
+      // stays visible instead of turning into a race.
+      await evaluate('document.fonts.ready.then(() => true)')
+      const ticksAtApply = await evaluate(TICKS)
+      const settledNow = "document.documentElement.dataset.numbersSettled === 'settled'"
+      const watchPasses = () => evaluate(`${TICKS} - ${ticksAtApply}`)
+      let clipped = []
+      let overrides = []
+      let today = { shown: false }
+      let passes = 0
+      let graded = false
+      const gradeDeadline = Date.now() + 25000
+      while (Date.now() < gradeDeadline) {
+        await sleep(150)
+        if (!await evaluate(settledNow)) continue
+        passes = await watchPasses()
+        const reading = await evaluate(MEASURE)
+        clipped = reading.clipped
+        overrides = reading.overrides
+        today = reading.today
+        if (passes >= 3) { graded = true; break }
+        // A clean page is a verdict once the watch has passed over it — or once
+        // it is clear the watch will never pass over anything, so the waiting
+        // itself cannot become the failure.
+        if (!clipped.length && (passes >= 1 || !watchRuns)) { graded = true; break }
+      }
+      if (!graded) {
+        entry.findings.push(`${label} @ ${fixture.name}: the card never reported a settled, re-checked state, ` +
+          `so its numbers were never graded — ${JSON.stringify(clipped).slice(0, 400)}`)
+      }
+      entry.fixtures[fixture.name] = { clipped, overrides, today, passes, graded, watchRuns }
       // Prove the fitter actually ran, not just that the page looks fine: a
       // silent no-op on another platform would otherwise pass by luck until a
-      // wider font made the same number overflow again.
+      // wider font made the same number overflow again. The witness came from
+      // the same snapshot as the clip list, so both describe one instant.
       if (fixture.name === 'millions') {
-        const engaged = await evaluate(`(() => {
-          const node = document.getElementById('stripToday')
-          if (!node) return { shown: false }
-          // The full chain, because the app's own fitter and this measurement
-          // disagree on one platform and only the geometry can say why.
-          const chain = []
-          for (let el = node; el && chain.length < 5; el = el.parentElement) {
-            const style = getComputedStyle(el)
-            const box = el.getBoundingClientRect()
-            chain.push({
-              el: el.id || (typeof el.className === 'string' && el.className.split(' ')[0]) || el.tagName,
-              ox: style.overflowX, to: style.textOverflow, ws: style.whiteSpace,
-              w: Math.round(box.width), right: Math.round(box.right)
-            })
-          }
-          return {
-            shown: node.getClientRects().length > 0,
-            inline: node.style.fontSize || '',
-            size: getComputedStyle(node).fontSize,
-            client: node.clientWidth, scroll: node.scrollWidth,
-            // Distinguishes "the app never called its fitter" (function absent,
-            // or renderStrip returned early) from "it called it and concluded
-            // the text fits", which the two numbers above cannot tell apart.
-            hasFit: typeof fitNumber === 'function',
-            usage: !!(state.data && state.data.usage),
-            chain
-          }
-        })()`)
-        // Only assert where the element is actually laid out: in the deck form
-        // the strip is display:none, so fitting correctly does nothing there.
-        if (engaged.shown) {
-          // The witness is the used size, not the inline attribute: a pass can
-          // leave the shrink in the cascade while the attribute reads empty, and
-          // CI showed exactly that on one runner. Nothing else in the app puts
-          // 11.2px on this element, so a used size under the stylesheet's 16px
-          // still proves the fitter ran.
-          assert.ok(parseFloat(engaged.size) < 16,
-            `${label}: the ¥123,456.78 figure was never shrunk — ${JSON.stringify(engaged)}`)
+        // Only grade where the element is actually laid out: in the deck form the
+        // strip is display:none, so fitting correctly does nothing there. The
+        // witness is the used size, not the inline attribute — a pass can leave
+        // the shrink in the cascade with the attribute empty, and CI showed that
+        // on one runner. Nothing else in the app puts 11.2px on this element.
+        if (today.shown && !(parseFloat(today.size) < 16)) {
+          entry.findings.push(`${label} @ ${fixture.name}: the ¥123,456.78 figure was never shrunk, ` +
+            `after ${passes} watch passes — ${JSON.stringify(today)}`)
         }
       }
       // Fitting must be invisible until it is needed: if the demo account
@@ -402,15 +477,10 @@ async function runOne(locale, view) {
       // slots are 10px and 8.5px in the stylesheet, so a computed size below the
       // strip's 16px says nothing about the fitter.
       if (fixture.name === 'demo baseline') {
-        const shrunk = await evaluate(`(() => {
-          const ids = ['stripToday', 'stripBalance', 'deckBalance', 'deckBalanceSub']
-          return ids
-            .map((id) => [id, document.getElementById(id)])
-            .filter(([, node]) => node && node.style.fontSize !== '')
-            .map(([id, node]) => ({ id, size: node.style.fontSize, text: node.textContent.trim() }))
-        })()`)
-        assert.deepEqual(shrunk, [],
-          `${label}: the demo values already needed a font-size override: ${JSON.stringify(shrunk)}`)
+        if (overrides.length) {
+          entry.findings.push(`${label} @ ${fixture.name}: the demo values already needed a font-size ` +
+            `override: ${JSON.stringify(overrides)}`)
+        }
       }
       const widest = await evaluate(`(() => {
         const read = (id) => document.getElementById(id)?.textContent?.trim() || ''
@@ -419,7 +489,12 @@ async function runOne(locale, view) {
           tokens: read('deckTokens') || read('stripTokens'),
           thirty: read('deckThirty'), volume: read('deckVolume') }
       })()`)
-      entry.fixtures[fixture.name] = { clipped, widest }
+      Object.assign(entry.fixtures[fixture.name], { clipped, widest })
+      if (lateMetrics) {
+        // Take the stress away again once this fixture has been graded, so the
+        // next magnitude is measured against the shipped stylesheet.
+        await evaluate('(() => { document.getElementById("late-metrics")?.remove(); return true })()')
+      }
       // Screenshots exist to eyeball what the measurement claims. Capturing
       // every fixture stalled the debugger between runs, so take the ones that
       // answer "does the shrink look sane?" plus anything that overflowed.
@@ -460,6 +535,10 @@ const offenders = results.flatMap((run) => Object.entries(run.fixtures)
 const advisoryNames = new Set(FIXTURES.filter((fixture) => fixture.advisory).map((fixture) => fixture.name))
 const unexpected = offenders.filter((item) => !advisoryNames.has(item.fixture))
 const atTheLimit = offenders.filter((item) => advisoryNames.has(item.fixture))
+// Every run's findings travel together and fail together. Round 9 learned this
+// the hard way: stopping at the first problem meant one CI round could only ever
+// reveal one platform's first problem, and three red rounds bought three facts.
+const findings = results.flatMap((run) => run.findings || [])
 
 // The measured limit, not a passed test: at ¥99,999,999,999.99 a day the
 // strip's today figure is the one place the type floor gives out — the ledger
@@ -471,10 +550,6 @@ const expectedLimit = [...new Set(results.map((run) => run.label))]
   .filter((label) => label.endsWith('/strip'))
   .map((label) => `${label} stripToday`)
   .sort()
-assert.deepEqual(unexpected, [],
-  `${unexpected.length} numbers escape their box: ${JSON.stringify(unexpected.slice(0, 12))}`)
-assert.deepEqual(limitSlots, expectedLimit,
-  `the extreme fixture was expected to overflow exactly the strip's today figure, got ${JSON.stringify(limitSlots)}`)
 const widest = {}
 for (const run of results) {
   for (const [fixture, seen] of Object.entries(run.fixtures)) {
@@ -486,11 +561,28 @@ for (const run of results) {
   }
 }
 
-fs.writeFileSync(path.join(root, 'shots', 'numbers-report.json'),
-  JSON.stringify({ offenders, limitSlots, widest, runs: results.map((run) => run.label) }, null, 2))
+// Evidence first, verdicts after. This check's whole purpose is to explain a
+// platform nobody has in the room, and an assertion that throws before the
+// report is written leaves that platform with nothing to read.
+const writeReport = (passed) => fs.writeFileSync(path.join(root, 'shots', 'numbers-report.json'),
+  JSON.stringify({
+    offenders, unexpected, limitSlots, widest, findings, passed,
+    runs: results.map((run) => ({ run: run.label, findings: run.findings, fixtures: run.fixtures }))
+  }, null, 2))
+writeReport(false)
 
 console.log(`Widest observed values: ${JSON.stringify(widest)}`)
 console.log(`Documented limit at the extreme fixture: ${JSON.stringify(atTheLimit.map((item) => `${item.run} ${item.pixels}px`))}`)
+console.log(`Findings: ${findings.length}`)
+
+assert.deepEqual(findings, [],
+  `${findings.length} fitting problems: ${JSON.stringify(findings).slice(0, 4000)}`)
+assert.deepEqual(unexpected, [],
+  `${unexpected.length} numbers escape their box: ${JSON.stringify(unexpected.slice(0, 12))}`)
+assert.deepEqual(limitSlots, expectedLimit,
+  `the extreme fixture was expected to overflow exactly the strip's today figure, got ${JSON.stringify(limitSlots)}`)
+
+writeReport(true)
 fs.rmSync(profileParent, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
 if (!keepShots) fs.rmSync(shotDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
 console.log(`Number fit passed: ${results.length} runs, ${FIXTURES.length} magnitudes each — shots: ${keepShots ? shotDir : 'removed'}`)
