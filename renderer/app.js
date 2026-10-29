@@ -23,16 +23,21 @@ const t = (text) => (I18N ? I18N.t(text, LOCALE) : text)
 function applyLanguage(root) {
   if (I18N && TRANSLATE) I18N.applyTree(root || document.body, LOCALE)
 }
-// Non-Chinese modes translate text where it is written, so no render path has
-// to remember to translate. Translated output no longer matches the CJK test,
-// so the observer cannot feed on its own writes.
+// Re-fitting must repeat the original decision, not a default one: each slot was
+// given its own floor and step count where it is fitted, so the remembered
+// options travel with the node. Dropping them was the reason a card that fitted
+// correctly at render time could end up six pixels wide again after a later pass
+// — whichever pass happened to be last decided the look.
 function refitNumbers() {
-  for (const node of fittedNodes) {
-    if (node.isConnected) fitNumber(node)
+  for (const [node, options] of fittedNodes) {
+    if (node.isConnected) fitNumber(node, options)
     else fittedNodes.delete(node)
   }
 }
 
+// Non-Chinese modes translate text where it is written, so no render path has
+// to remember to translate. Translated output no longer matches the CJK test,
+// so the observer cannot feed on its own writes.
 function installLanguageMirror() {
   if (!I18N || !TRANSLATE || typeof MutationObserver === 'undefined') return
   const observer = new MutationObserver((records) => {
@@ -305,11 +310,11 @@ function setRunwayType(node, value, base, compact = false) {
 // shrink the type until the text measurably fits the box that clips it, and
 // stop at a floor below which the number stops being readable.
 // Nodes are remembered so every later change to their text re-fits them.
-const fittedNodes = new Set()
+const fittedNodes = new Map()
 
 function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   if (!node) return
-  fittedNodes.add(node)
+  fittedNodes.set(node, { floor, steps })
   // A hidden form has no metrics to fit against, and this has to be decided
   // before the reset below: clearing the size and then leaving would erase the
   // fit a visible pass already made, which is one way a correct card becomes an

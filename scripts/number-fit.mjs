@@ -263,9 +263,10 @@ const MEASURE = `(() => {
       // the fitter's own set holds: a detached clone would explain a fit that
       // lands on a number nobody can see.
       cached: el.stripToday === node, cachedConnected: Boolean(el.stripToday?.isConnected),
-      fitted: [...(typeof fittedNodes === 'undefined' ? [] : fittedNodes)]
+      fitted: Array.from(typeof fittedNodes === 'undefined' ? [] : fittedNodes.keys())
         .filter((item) => item.id)
-        .map((item) => item.id + ':' + (item.isConnected ? 'live' : 'detached')),
+        .map((item) => item.id + ':' + (item.isConnected ? 'live' : 'detached')
+          + ':' + (fittedNodes.get(item)?.floor ?? '?')),
       ticks: document.documentElement.dataset.numberWatchTicks || '0',
       usage: !!(state.data && state.data.usage),
       chain
