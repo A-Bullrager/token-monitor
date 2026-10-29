@@ -18,6 +18,26 @@ function run(command, args, options = {}) {
   if (result.error) throw result.error
   if (result.status !== 0) throw new Error(`${command} failed (exit ${result.status}, signal ${result.signal})`)
 }
+// macOS hands out "Resource busy" (hdiutil exit 16) for both attaching and
+// detaching a disk image when something else on the machine still holds the
+// volume — the same race that made the DMG build step need a bounded retry back
+// in cloud round 3, now seen on the verification step on macOS Intel. The mount
+// point is this script's own, so retrying it cannot unmount anything belonging
+// to anyone else; three attempts, every failed one logged, and a busy volume that
+// outlasts them is still a failure rather than a warning.
+function hdiutil(args) {
+  const attempts = []
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const result = spawnSync('hdiutil', args, { cwd: root, encoding: 'utf8' })
+    if (!result.error && result.status === 0) {
+      if (attempts.length) console.log(`hdiutil ${args[0]} succeeded on attempt ${attempt} after: ${JSON.stringify(attempts)}`)
+      return
+    }
+    attempts.push({ attempt, exit: result.status ?? 'spawn-error', out: String(result.stderr || result.stdout || result.error || '').trim().slice(0, 200) })
+    spawnSync('sleep', String(2 * attempt))
+  }
+  throw new Error(`hdiutil ${args[0]} failed three times: ${JSON.stringify(attempts)}`)
+}
 function archive(extension) {
   const file = path.join(release, `${stem}.${extension}`)
   if (!fs.existsSync(file) || !fs.statSync(file).size) throw new Error(`Missing archive: ${file}`)
@@ -79,13 +99,13 @@ try {
     // Mount the DMG read-only, copy its app as an installation would, then run.
     const mount = path.join(verifyDir, 'mounted')
     fs.mkdirSync(mount)
-    run('hdiutil', ['attach', archive('dmg'), '-readonly', '-nobrowse', '-mountpoint', mount])
+    hdiutil(['attach', archive('dmg'), '-readonly', '-nobrowse', '-mountpoint', mount])
     const installed = path.join(verifyDir, 'dmg', `${productName}.app`)
     try {
       fs.mkdirSync(path.dirname(installed))
       run('ditto', [path.join(mount, `${productName}.app`), installed])
     } finally {
-      run('hdiutil', ['detach', mount])
+      hdiutil(['detach', mount])
     }
     run('codesign', ['--verify', '--deep', '--strict', installed])
     check(path.join(installed, 'Contents', 'MacOS', productName))
