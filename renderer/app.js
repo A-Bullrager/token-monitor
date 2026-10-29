@@ -171,16 +171,20 @@ function plainMoney(value, digits = 2) {
 }
 
 // The deck's breakdown line is a summary — "how much came from each source" —
-// while the headline above it is a statement. Two exact figures at ¥99,999,999.99
-// need 223px of a 160px line on a German card, and money type cannot be shrunk
-// that far and stay money. So above a million the breakdown reads in the units
+// while the headline above it is a statement. Two exact figures with two currency
+// symbols do not fit that line at every magnitude on every platform, and money
+// type cannot be shrunk far enough and stay money. So from ten thousand up the
+// breakdown reads in the units
 // each language already uses for counts, and every digit stays where they belong:
-// in the headline, which has the room for them.
+// in the headline, which has the room for them. The boundary is ten thousand —
+// `formatTokens` applies the same one — because macOS Intel reported the German
+// version of ¥999,999.99 + ¥234,567.90 eight pixels past its wall at a threshold
+// that let that magnitude through as exact text.
 function moneySummary(value) {
   if (value == null || !Number.isFinite(Number(value))) return '—'
   if (state.privacy) return `${currencySymbol()}••`
   const n = Number(value)
-  if (Math.abs(n) < 1e6) return `${currencySymbol()}${formatNumber(n, 2)}`
+  if (Math.abs(n) < 1e4) return `${currencySymbol()}${formatNumber(n, 2)}`
   // The compact form carries no currency sign: the line sits directly under a
   // balance that already shows it, and on an Apple Silicon runner the German
   // version of this line measured 208px in a 202px box — two ¥ signs were the
