@@ -60,8 +60,7 @@ As duas imagens abaixo vêm de uma janela real em execução, não da vitrine en
 ## Baixar e executar
 
 Lançamentos: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Compilações de desenvolvimento estão nos Artifacts de cada execução do Actions.
-**[v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0) é a versão atual** — a que trouxe a interface bilíngue (chinês / inglês). Os quatro runners nativos passaram, e a página traz seis pacotes mais `SHA256SUMS.txt`. O pacote do Windows foi baixado de novo daquela página, bateu com a soma de verificação e foi extraído e iniciado em um Windows 10 de verdade; os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners, não pela máquina do desenvolvedor.
-**A interface em espanhol, português e alemão descrita abaixo está na `main` e ainda não entrou em nenhuma compilação publicada** — se você baixar a v2.5.0, leva chinês e inglês.
+**[v2.6.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.0) é a versão atual** — a de cinco idiomas: chinês, inglês, espanhol, português do Brasil e alemão. Os quatro runners nativos passaram, e a página traz seis pacotes mais `SHA256SUMS.txt`. O pacote do Windows foi baixado de novo daquela página, bateu com a soma de verificação e foi extraído e iniciado em um Windows 10 de verdade; os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners, não pela máquina do desenvolvedor.
 
 | Plataforma | Pacote | Como executar |
 | --- | --- | --- |
@@ -187,10 +186,10 @@ A interface é escrita em chinês, e cada outro idioma é um dicionário cujas c
 
 **Local (Windows 10 x64)**: passam os testes de dados, 22 grupos de asserções sobre backends de armazenamento simulados, a paridade dos dicionários, a demanda de glifos, a interface pelo código, a compilação em diretório e uma extração e inicialização reais do ZIP; passam 16 cenários de idioma × 4 estados da interface, todo caractere coletado está dentro do corpus e nenhum rótulo fica cortado em nenhum idioma incluído. fontTools foi usado contra os cmap reais dos subconjuntos: todo caractere latino que os dicionários podem pôr na tela está no subconjunto do Inter, e todo caractere chinês do conjunto de demanda está em um dos dois pacotes.
 
-**Oito rodadas na nuvem até aqui; a versão publicada está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva.
+**Onze rodadas na nuvem até aqui; a versão publicada está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva.
 
 <details>
-<summary>Histórico de compilações na nuvem (rodadas 1–8)</summary>
+<summary>Histórico de compilações na nuvem (rodadas 1–11)</summary>
 
 **Rodada 1 na nuvem (`9faa78e`, quatro runners nativos)**: Windows x64 verde; Linux x64 leu errado "o socket do depurador fechou antes da resposta" durante o encerramento e tomou como falha; as duas compilações de macOS foram assinadas e verificadas, mas a checagem de inicialização do app empacotado expirou na primeira ida e volta CDP.
 
@@ -209,6 +208,11 @@ A interface é escrita em chinês, e cada outro idioma é um dicionário cujas c
 **Segunda tentativa bilíngue (`d62fc57`, os quatro verdes)**: em runners Linux e macOS com host em inglês passaram os 11 cenários de idioma / fuso, a regressão da interface e as checagens de inicialização do AppImage extraído e da instalação pelo DMG, produzindo pacotes 2.5.0 para toda plataforma.
 
 **Rodada 8 (tag `v2.5.0`, execução 40660748693)**: enviar a tag sozinha ativou o pipeline de tag, os quatro runners passaram e o job de lançamento conferiu os seis pacotes, gerou `SHA256SUMS.txt` e publicou. O pacote do Windows foi baixado de novo da página do lançamento, seu SHA256 bateu com a lista, e ele foi extraído e iniciado aqui pelas mesmas asserções de qualquer outra compilação. Os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners.
+
+
+**Rodada 9 (`5a21201`, o primeiro commit de cinco idiomas) falhou só no macOS**: a nova asserção de caimento de rótulo reportou a linha de ritmo *em inglês* 12px fora da caixa no macOS Apple Silicon, enquanto a compilação idêntica estava limpa no Windows e no Linux — aquela linha tinha sido dimensionada pelas fontes da máquina que a escreveu. E a checagem parava no primeiro cenário com falha, então uma rodada só conseguia revelar o primeiro problema de uma plataforma.
+**Rodada 10 (`819601e`, os quatro verdes)**: a varredura de caimento agora acumula todo cenário e estado e falha uma vez com a lista inteira, e o texto em inglês virou `15 active days of 30` — a mesma frase com menos caracteres, que é a diferença entre um rótulo e um rótulo cortado.
+**Rodada 11 (tag `v2.6.0`, execução 40801968504)**: enviar a tag sozinha ativou o pipeline de tag, os quatro runners passaram e o job de lançamento conferiu os seis pacotes, gerou `SHA256SUMS.txt` e publicou. O pacote do Windows foi baixado de novo da página do lançamento, seu SHA256 bateu com a lista, e ele foi extraído e iniciado aqui pelas mesmas asserções de qualquer outra compilação (`isPackaged`, versão 2.6.0). Os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners.
 
 </details>
 
@@ -282,7 +286,7 @@ Uma tag com `-` (por exemplo `v2.5.0-beta.1`) é publicada como pré-lançamento
 
 ```bash
 git push origin main          # primeiro: deixe os quatro runners ficarem verdes no commit novo
-git push origin v2.5.0        # depois: envie a tag sozinha, que é o que dispara uma Release
+git push origin v2.6.0        # depois: envie a tag sozinha, que é o que dispara uma Release
 ```
 
 Documentação do GitHub: [runners hospedados](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [eventos que disparam fluxos de trabalho](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

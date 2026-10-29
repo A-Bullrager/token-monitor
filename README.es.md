@@ -60,8 +60,7 @@ Las dos imágenes de abajo vienen de una ventana en ejecución real y no del esc
 ## Descarga y uso
 
 Lanzamientos: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Las compilaciones de desarrollo están en los Artifacts de cada ejecución de Actions.
-**[v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0) es la versión actual** — la que trajo la interfaz bilingüe (chino / inglés). Los cuatro runners nativos pasaron y la página lleva seis paquetes más `SHA256SUMS.txt`. El paquete de Windows se volvió a descargar de esa página, coincidió con su suma de verificación y se descomprimió y arrancó en un Windows 10 real; los paquetes de Linux y macOS solo los cubre su propio runner, no el escritorio del desarrollador.
-**La interfaz en español, portugués y alemán que se describe aquí vive en `main` y aún no está en ninguna compilación publicada** — si descargas v2.5.0 obtienes chino e inglés.
+**[v2.6.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.0) es la versión actual** — la de cinco idiomas: chino, inglés, español, portugués de Brasil y alemán. Los cuatro runners nativos pasaron y la página lleva seis paquetes más `SHA256SUMS.txt`. El paquete de Windows se volvió a descargar de esa página, coincidió con su suma de verificación y se descomprimió y arrancó en un Windows 10 real; los paquetes de Linux y macOS solo los cubre su propio runner, no el escritorio del desarrollador.
 
 | Plataforma | Paquete | Cómo ejecutarlo |
 | --- | --- | --- |
@@ -187,10 +186,10 @@ La interfaz está escrita en chino y cada otro idioma es un diccionario cuyas cl
 
 **Local (Windows 10 x64)**: pasan las pruebas de datos, 22 grupos de aserciones sobre backends de almacenamiento simulados, la paridad de diccionarios, la demanda de glifos, la interfaz desde el código, la compilación en directorio y una extracción y arranque reales del ZIP; pasan 16 escenarios de idioma × 4 estados de interfaz, cada carácter recogido está dentro del corpus y ninguna etiqueta queda recortada en ningún idioma incluido. fontTools se usó contra los cmap reales de los subconjuntos: todo carácter latino que los diccionarios pueden poner en pantalla está en el subconjunto de Inter, y todo carácter chino del conjunto de demanda está en uno de los dos paquetes.
 
-**Ocho rondas en la nube hasta ahora; la versión publicada está verde en los cuatro runners nativos.** El relato ronda a ronda está plegado abajo — todo lo que demostró algo *negativo* se dice fuera del pliegue, para que plegar no pueda ocultar una advertencia.
+**Once rondas en la nube hasta ahora; la versión publicada está verde en los cuatro runners nativos.** El relato ronda a ronda está plegado abajo — todo lo que demostró algo *negativo* se dice fuera del pliegue, para que plegar no pueda ocultar una advertencia.
 
 <details>
-<summary>Historial de compilaciones en la nube (rondas 1–8)</summary>
+<summary>Historial de compilaciones en la nube (rondas 1–11)</summary>
 
 **Ronda 1 en la nube (`9faa78e`, cuatro runners nativos)**: Windows x64 verde; Linux x64 leyó mal "el socket del depurador se cerró antes de la respuesta" durante el cierre y lo tomó por fallo; las dos compilaciones de macOS se firmaron y verificaron, pero la comprobación de arranque de la app empaquetada expiró en su primer viaje CDP.
 
@@ -209,6 +208,11 @@ La interfaz está escrita en chino y cada otro idioma es un diccionario cuyas cl
 **Segundo intento bilingüe (`d62fc57`, los cuatro verdes)**: en runners Linux y macOS con host en inglés pasaron los 11 escenarios de idioma / zona horaria, la regresión de interfaz y las comprobaciones de arranque del AppImage extraído y la instalación desde DMG, produciendo paquetes 2.5.0 para cada plataforma.
 
 **Ronda 8 (etiqueta `v2.5.0`, ejecución 40660748693)**: empujar la etiqueta sola activó el pipeline de etiqueta, los cuatro runners pasaron y el trabajo de lanzamiento revisó los seis paquetes, generó `SHA256SUMS.txt` y publicó. El paquete de Windows se volvió a descargar de la página del lanzamiento, su SHA256 coincidió con la lista y se extrajo y arrancó aquí con las mismas aserciones que cualquier otra compilación. Los paquetes de Linux y macOS los cubre solo su propio runner.
+
+
+**Ronda 9 (`5a21201`, el primer commit de cinco idiomas) falló solo en macOS**: la nueva aserción de ajuste de etiquetas reportó la línea de ritmo *en inglés* 12px fuera de su caja en macOS Apple Silicon, mientras la compilación idéntica estaba limpia en Windows y Linux — la línea se había dimensionado contra las fuentes de la máquina que la escribió. La comprobación además se paraba en el primer escenario fallido, así que una ronda solo podía revelar el primer problema de una plataforma.
+**Ronda 10 (`819601e`, los cuatro verdes)**: el barrido de ajuste ahora recoge cada escenario y estado y falla una sola vez con la lista completa, y el texto inglés pasó a `15 active days of 30` — lo mismo dicho con menos caracteres, que es la diferencia entre una etiqueta y una etiqueta cortada.
+**Ronda 11 (etiqueta `v2.6.0`, ejecución 40801968504)**: empujar la etiqueta sola activó el pipeline de etiqueta, los cuatro runners pasaron y el trabajo de lanzamiento verificó los seis paquetes, generó `SHA256SUMS.txt` y publicó. El paquete de Windows se volvió a descargar de la página del lanzamiento, su SHA256 coincidió con la lista y se extrajo y arrancó aquí con las mismas aserciones que cualquier otra compilación (`isPackaged`, versión 2.6.0). Los paquetes de Linux y macOS los cubre solo su propio runner.
 
 </details>
 
@@ -282,7 +286,7 @@ Una etiqueta con `-` (por ejemplo `v2.5.0-beta.1`) se publica como pre-lanzamien
 
 ```bash
 git push origin main          # primero: deja que los cuatro runners se pongan verdes con el commit nuevo
-git push origin v2.5.0        # después: empuja la etiqueta sola, que es lo que dispara una Release
+git push origin v2.6.0        # después: empuja la etiqueta sola, que es lo que dispara una Release
 ```
 
 Documentación de GitHub: [runners alojados](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [eventos que disparan flujos de trabajo](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

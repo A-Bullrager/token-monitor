@@ -60,8 +60,7 @@ Die beiden Bilder unten kommen aus einem echten Fenster statt aus der gestellten
 ## Herunterladen und ausführen
 
 Veröffentlichungen: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Entwicklungsbauten liegen in den Artifacts jedes Actions-Laufs.
-**[v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0) ist die aktuelle Veröffentlichung** — der Build mit der zweisprachigen Oberfläche (Chinesisch / Englisch). Alle vier nativen Runner waren grün, und die Seite trägt sechs Pakete plus `SHA256SUMS.txt`. Das Windows-Paket wurde von dieser Seite neu heruntergeladen, hat zur Prüfsumme gepasst und wurde auf einem echten Windows-10-Rechner entpackt und gestartet; die Pakete für Linux und macOS decken nur ihre eigenen Runner ab, nicht den Rechner des Entwicklers.
-**Die unten beschriebene Oberfläche auf Spanisch, Portugiesisch und Deutsch lebt auf `main` und ist in noch keinem veröffentlichten Build** — wer v2.5.0 herunterlädt, bekommt Chinesisch und Englisch.
+**[v2.6.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.0) ist die aktuelle Veröffentlichung** — der Fünf-Sprachen-Bau: Chinesisch, Englisch, Spanisch, Brasilianisch-Portugiesisch und Deutsch. Alle vier nativen Runner waren grün, und die Seite trägt sechs Pakete plus `SHA256SUMS.txt`. Das Windows-Paket wurde von dieser Seite neu heruntergeladen, hat zur Prüfsumme gepasst und wurde auf einem echten Windows-10-Rechner entpackt und gestartet; die Pakete für Linux und macOS decken nur ihre eigenen Runner ab, nicht den Rechner des Entwicklers.
 
 | Plattform | Paket | So startest du es |
 | --- | --- | --- |
@@ -187,10 +186,10 @@ Die Oberfläche ist auf Chinesisch geschrieben, und jede andere Sprache ist ein 
 
 **Lokal (Windows 10 x64)**: Datentests, 22 Gruppen von Storage-Backend-Assertions mit simulierten Backends, Wörterbuch-Parität, Glyph-Bedarf, Oberfläche aus dem Quellcode, Verzeichnisbau und ein echtes ZIP-Entpacken und Starten sind grün; 16 Sprach-Szenarien × 4 Oberflächenzustände sind grün, jedes gesammelte Zeichen liegt im Korpus, und in keiner mitgelieferten Sprache wird ein Label abgeschnitten. fontTools wurde gegen die echten Subset-cmaps eingesetzt — jedes lateinische Zeichen, das die Wörterbücher auf den Schirm bringen können, sitzt im Inter-Subset, und jedes chinesische Zeichen im Bedarfsatz sitzt in einem der beiden Pakete.
 
-**Acht Cloud-Runden bisher; die aktuelle Veröffentlichung ist auf allen vier nativen Runnern grün.** Die Erzählung Runde für Runde ist unten eingeklappt — alles, was sie *negativ* belegt hat, steht außerhalb der Klappung, damit Einklappen keine Einschränkung verstecken kann.
+**Elf Cloud-Runden bisher; die aktuelle Veröffentlichung ist auf allen vier nativen Runnern grün.** Die Erzählung Runde für Runde ist unten eingeklappt — alles, was sie *negativ* belegt hat, steht außerhalb der Klappung, damit Einklappen keine Einschränkung verstecken kann.
 
 <details>
-<summary>Cloud-Baugeschichte (Runden 1–8)</summary>
+<summary>Cloud-Baugeschichte (Runden 1–11)</summary>
 
 **Cloud-Runde 1 (`9faa78e`, vier native Runner)**: Windows x64 grün; Linux x64 las "der Debugger-Socket schloss vor der Antwort" beim Beenden falsch als Fehler; beide macOS-Bauten signiert und verifiziert, aber die Startprüfung der gepackten App lief beim ersten CDP-Hin-und-Zurück in den Timeout.
 
@@ -209,6 +208,11 @@ Die Oberfläche ist auf Chinesisch geschrieben, und jede andere Sprache ist ein 
 **Zweiter zweisprachiger Versuch (`d62fc57`, alle vier grün)**: auf englischsprachigen Linux- und macOS-Runnern bestanden die 11 Sprach- / Zeitzonen-Szenarien, die UI-Regression und die Startprüfungen aus entpacktem AppImage plus DMG-Installation — und erzeugten 2.5.0-Pakete für jede Plattform.
 
 **Cloud-Runde 8 (`v2.5.0`-Tag, Lauf 40660748693)**: den Tag allein zu pushen löste das Tag-Pipeline aus, alle vier Runner bestanden, und der Release-Job prüfte die sechs Pakete, erzeugte `SHA256SUMS.txt` und veröffentlichte. Das Windows-Paket wurde von der Release-Seite neu geladen, seine SHA256 passte zur Liste, und es wurde hier über dieselben Assertions wie jeder andere Build entpackt und gestartet. Linux- und macOS-Pakete decken nur ihre eigenen Runner ab.
+
+
+**Runde 9 (`5a21201`, der erste Fünf-Sprachen-Commit) scheiterte nur auf macOS**: die neue Label-Passungs-Assertion meldete die Tempenzeile *auf Englisch* 12px außerhalb ihrer Box auf macOS Apple Silicon, während der identische Build auf Windows und Linux sauber war — die Zeile war gegen die Schriften des Rechners gerechnet worden, der sie geschrieben hatte. Die Prüfung stoppte außerdem beim ersten fehlgeschlagenen Szenario, eine Runde konnte also nur das erste Problem einer Plattform zeigen.
+**Runde 10 (`819601e`, alle vier grün)**: der Passungs-Durchlauf sammelt jetzt jedes Szenario und jeden Zustand und scheitert einmal mit der ganzen Liste, und der englische Text wurde `15 active days of 30` — dieselbe Aussage in weniger Zeichen, und weniger Zeichen sind der Unterschied zwischen einem Label und einem abgeschnittenen.
+**Runde 11 (`v2.6.0`-Tag, Lauf 40801968504)**: den Tag allein zu pushen löste das Tag-Pipeline aus, alle vier Runner bestanden, und der Release-Job verifizierte die sechs Pakete, erzeugte `SHA256SUMS.txt` und veröffentlichte. Das Windows-Paket wurde von der Release-Seite neu geladen, seine SHA256 passte zur Liste, und es wurde hier über dieselben Assertions wie jeder andere Build entpackt und gestartet (`isPackaged`, Version 2.6.0). Linux- und macOS-Pakete decken nur ihre eigenen Runner ab.
 
 </details>
 
@@ -282,7 +286,7 @@ Ein Tag mit `-` (zum Beispiel `v2.5.0-beta.1`) wird als Pre-Release veröffentli
 
 ```bash
 git push origin main          # zuerst: alle vier Runner auf dem neuen Commit grün werden lassen
-git push origin v2.5.0        # danach: den Tag allein pushen, das ist der Release-Auslöser
+git push origin v2.6.0        # danach: den Tag allein pushen, das ist der Release-Auslöser
 ```
 
 GitHub-Dokumentation: [gehostete Runner](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [Events, die Workflows auslösen](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

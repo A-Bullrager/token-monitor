@@ -60,8 +60,7 @@ The two images below come from a live window rather than the staged showcase, as
 ## Download and run
 
 Releases: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Development builds are in the Artifacts of each Actions run.
-**[v2.5.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.5.0) is the current release** — the bilingual (Chinese / English) interface build. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and was extracted and launched on a real Windows 10 machine; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop.
-**The Spanish, Portuguese and German interface described below lives on `main` and is not in any published build yet** — download v2.5.0 and you get Chinese and English.
+**[v2.6.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.0) is the current release** — the five-language build: Chinese, English, Spanish, Brazilian Portuguese and German. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and was extracted and launched on a real Windows 10 machine; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop.
 
 | Platform | Package | How to run it |
 | --- | --- | --- |
@@ -187,10 +186,10 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 **Local (Windows 10 x64)**: data tests, 22 mocked storage-backend assertion groups, dictionary parity, glyph demand, source UI, directory build and a real ZIP extraction and launch all pass; 16 language scenarios × 4 interface states pass, every collected character is inside the corpus, and no label is clipped in any shipped language. fontTools was used against the actual subset cmaps — every Latin character the dictionaries can put on screen is in the Inter subset, and every Chinese character in the demand set is in one of the two bundles.
 
-**Eight cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat.
+**Eleven cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat.
 
 <details>
-<summary>Cloud build history (rounds 1–8)</summary>
+<summary>Cloud build history (rounds 1–11)</summary>
 
 **Cloud round 1 (`9faa78e`, four native runners)**: Windows x64 green; Linux x64 misread "the debugger socket closed before the reply" during shutdown as a failure; both macOS builds signed and verified, but the packaged-app launch check timed out on its first CDP round trip.
 
@@ -209,6 +208,12 @@ The interface is authored in Chinese, and every other language is a dictionary k
 **Second bilingual attempt (`d62fc57`, all four green)**: on English-hosted Linux and macOS runners the 11 language / timezone scenarios, the UI regression and the extracted AppImage plus DMG-install launch checks all passed, producing 2.5.0 packages for every platform.
 
 **Cloud round 8 (`v2.5.0` tag, run 40660748693)**: pushing the tag on its own triggered the tag pipeline, all four runners passed, and the release job checked the six packages, generated `SHA256SUMS.txt` and published. The Windows package was re-downloaded from the release page, its SHA256 matched the list, and it was extracted and launched here through the same assertions as any other build. The Linux and macOS packages are covered by their own runners only.
+
+**Round 9 (`5a21201`, the first five-language commit) failed on macOS only**: the new label-fitting assertion reported the *English* pace line 12px past its box on macOS Apple Silicon, while the identical build was clean on Windows and Linux — the line had been sized against the fonts of the machine that wrote it. The check also stopped at the first failing scenario, so a single round could only ever reveal one platform's first problem.
+
+**Round 10 (`819601e`, all four green)**: the fitting sweep now collects every scenario and state and fails once with the whole list, and the English wording became `15 active days of 30` — same statement, fewer characters, which is the difference between a label and a clipped one.
+
+**Round 11 (`v2.6.0` tag, run 40801968504)**: pushing the tag alone triggered the tag pipeline, all four runners passed, and the release job verified the six packages, generated `SHA256SUMS.txt` and published. The Windows package was re-downloaded from the release page, its SHA256 matched the list, and it was extracted and launched here through the same assertions as any other build (`isPackaged`, version 2.6.0). The Linux and macOS packages are covered by their own runners only.
 
 </details>
 
@@ -282,7 +287,7 @@ A tag containing `-` (for example `v2.5.0-beta.1`) is published as a pre-release
 
 ```bash
 git push origin main          # first: let all four runners go green on the new commit
-git push origin v2.5.0        # then: push the tag alone, which is what triggers a Release
+git push origin v2.6.0        # then: push the tag alone, which is what triggers a Release
 ```
 
 GitHub documentation: [hosted runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
