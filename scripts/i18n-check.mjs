@@ -404,6 +404,10 @@ async function runScenario(scenario) {
     }
     const capture = async (state) => {
       await evaluate('document.fonts.ready.then(() => true)')
+      // Grade labels only after the instrument stops re-fitting its own numbers.
+      // Judging inside that window measures a page still correcting itself, which
+      // is how a red run can be the checker's timing rather than the product's.
+      await waitFor("document.documentElement.dataset.numbersSettled === 'settled'", 'number settle')
       const data = await evaluate(COLLECT)
       entry.states[state] = data
       await shoot(`${scenario.name}-${state}.png`)

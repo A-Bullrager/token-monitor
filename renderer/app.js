@@ -326,7 +326,15 @@ function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
 let settleTimers = []
 function scheduleSettle() {
   for (const timer of settleTimers) clearTimeout(timer)
-  settleTimers = [250, 1000].map((delay) => setTimeout(refitNumbers, delay))
+  // Say out loud that the instrument is still correcting itself. Anything that
+  // grades the fit — the number check first — then waits for the page to be
+  // done instead of guessing a delay. Judging at a fixed delay measured a page
+  // mid-correction on every platform and reported the product as broken.
+  document.documentElement.dataset.numbersSettled = 'pending'
+  settleTimers = [250, 1000].map((delay) => setTimeout(() => {
+    refitNumbers()
+    if (delay === 1000) document.documentElement.dataset.numbersSettled = 'settled'
+  }, delay))
 }
 
 function setText(node, value) {

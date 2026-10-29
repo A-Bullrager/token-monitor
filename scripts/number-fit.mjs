@@ -327,19 +327,28 @@ async function runOne(locale, view) {
     for (const fixture of FIXTURES) {
       await evaluate(APPLY(fixture.name, fixture.ops))
       // Measure the settled page, not a moment in it. The app re-fits after
-      // fonts land and after a short settle delay, because macOS resolves its
+      // fonts land and after its own settle delays, because macOS resolves its
       // system monospace later than first paint; reading too early would grade
       // a state the product is about to correct — which is exactly the mistake
-      // the fitter itself made.
+      // the fitter itself made. So the app announces the correction window, and
+      // this check waits for it to close before it reads anything.
       await evaluate('document.fonts.ready.then(() => true)')
       let clipped = []
-      for (let attempt = 0; attempt < 12; attempt++) {
-        await sleep(300)
+      let observedSettled = false
+      const settleDeadline = Date.now() + 20000
+      while (Date.now() < settleDeadline) {
+        await sleep(150)
+        if (!await evaluate("document.documentElement.dataset.numbersSettled === 'settled'")) {
+          clipped = []
+          continue
+        }
         const again = await evaluate(MEASURE)
-        const stable = JSON.stringify(again) === JSON.stringify(clipped)
+        observedSettled = true
+        if (JSON.stringify(again) === JSON.stringify(clipped)) { clipped = again; break }
         clipped = again
-        if (stable && attempt >= 2) break
       }
+      assert(observedSettled,
+        `${label} @ ${fixture.name}: the page never reported a settled fit, so its numbers were never graded`)
       // Prove the fitter actually ran, not just that the page looks fine: a
       // silent no-op on another platform would otherwise pass by luck until a
       // wider font made the same number overflow again.
