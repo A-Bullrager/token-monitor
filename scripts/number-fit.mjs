@@ -36,6 +36,11 @@ const only = (process.argv.find((arg) => arg.startsWith('--only=')) || '').split
 // harness's.
 const lateMetrics = !process.argv.includes('--no-late-metrics')
 const freezeWatch = process.argv.includes('--freeze-watch')
+// A wider face than any shipped platform uses, to make the instrument's margin
+// visible from one machine: CI's runners read ~5% wider than this one, and a fix
+// that only just catches them would otherwise be invisible until the next red
+// round. The family is asked for by name so it can be pointed at anything installed.
+const wideFonts = (process.argv.find((arg) => arg.startsWith('--wide-fonts=')) || '').split('=')[1]
 const shotDir = keepShots
   ? path.join(root, 'shots', 'numbers')
   : fs.mkdtempSync(path.join(os.tmpdir(), 'token-monitor-numbers-'))
@@ -393,6 +398,16 @@ async function runOne(locale, view) {
     await evaluate('(() => { window.__tmBaseline = JSON.parse(JSON.stringify(state.data)); return true })()')
     if (freezeWatch) {
       await evaluate('(() => { clearInterval(numberWatch); numberWatch = null; return true })()')
+    }
+    if (wideFonts) {
+      await evaluate(`(() => {
+        const style = document.createElement('style')
+        style.textContent = 'body, .mono, .today-value, input, select { font-family: ${wideFonts} !important; }'
+        document.head.appendChild(style)
+        renderStrip()
+        renderDeck()
+        return true
+      })()`)
     }
     // Does the card actually re-check its own numbers? Asked once per window, in
     // the same terms the product offers, so a watch that stopped running is a

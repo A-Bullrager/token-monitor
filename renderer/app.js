@@ -165,6 +165,23 @@ function plainMoney(value, digits = 2) {
   return formatNumber(value, digits)
 }
 
+// The deck's breakdown line is a summary — "how much came from each source" —
+// while the headline above it is a statement. Two exact figures at ¥99,999,999.99
+// need 223px of a 160px line on a German card, and money type cannot be shrunk
+// that far and stay money. So above a million the breakdown reads in the units
+// each language already uses for counts, and every digit stays where they belong:
+// in the headline, which has the room for them.
+function moneySummary(value) {
+  if (value == null || !Number.isFinite(Number(value))) return '—'
+  const head = currencySymbol()
+  if (state.privacy) return `${head}••`
+  const n = Number(value)
+  if (Math.abs(n) < 1e6) return `${head}${formatNumber(n, 2)}`
+  if (TRANSLATE) return `${head}${I18N.compactCount(n, LOCALE)}`
+  if (Math.abs(n) >= 1e8) return `${head}${(n / 1e8).toFixed(2)} 亿`
+  return `${head}${(n / 1e4).toFixed(Math.abs(n) >= 1e7 ? 0 : 1)} 万`
+}
+
 function formatTokens(value) {
   if (value == null || !Number.isFinite(Number(value))) return '—'
   const n = Number(value)
@@ -840,9 +857,12 @@ function renderDeck() {
   if (el.currency) el.currency.textContent = currencySymbol()
   el.ledgerMoney?.classList.toggle('is-empty', !b)
   el.deckBalance.textContent = b ? plainMoney(b.total) : '—'
-  fitNumber(el.deckBalance)
+  // The headline is the one place with room to give: at 60% of its own size it is
+  // still a large figure, and a runner whose font metrics run a little wider than
+  // this machine's needed exactly that much more.
+  fitNumber(el.deckBalance, { floor: 0.6 })
   setText(el.deckBalanceSub, b
-    ? `充值 ${money(b.topup)} · 赠金 ${money(b.grant)}`
+    ? `充值 ${moneySummary(b.topup)} · 赠金 ${moneySummary(b.grant)}`
     : '尚未读取到余额')
   fitNumber(el.deckBalanceSub)
 

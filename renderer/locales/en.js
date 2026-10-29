@@ -45,7 +45,7 @@
 '部分连接 · 余额待补充': 'Partial · balance missing',
 '等待连接': 'Awaiting connection',
 '需要用量数据': 'Needs usage data',
-'样本偏少 · 仅供参考': 'Thin sample · indicative',
+'样本偏少 · 仅供参考': 'Few days · indicative',
 '— / 天': '— / day',
 '按 30 天活跃日': '30-day active pace',
 '按 7 天自然日': '7-day calendar pace',
