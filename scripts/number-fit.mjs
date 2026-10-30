@@ -189,68 +189,36 @@ const MEASURE = `(() => {
     }
     return true
   }
-  const limitOf = (el) => {
-    for (let node = el; node; node = node.parentElement) {
-      const style = getComputedStyle(node)
-      if (style.overflowX === 'visible' && style.textOverflow !== 'ellipsis') continue
-      const box = node.getBoundingClientRect()
-      return box.right - (parseFloat(style.paddingRight) || 0)
-    }
-    return window.innerWidth
-  }
-  // The same rule the card uses: measure the ink, and compare it to the wall the
-  // ink would actually hit — the nearest ancestor allowed to clip, or the first
-  // element beginning to the right on the same line. Spill into empty space is not
-  // something a reader loses, and asking for it made the product shrink numbers it
-  // never needed to shrink. Kept as a mirror of fitNumber() in app.js on purpose:
-  // if the two disagree, the check is grading a fiction.
-  const inkRightOf = (el) => {
-    const range = document.createRange()
-    range.selectNodeContents(el)
-    const rects = range.getClientRects()
-    if (!rects.length) return el.getBoundingClientRect().right
-    let right = 0
-    for (const rect of rects) right = Math.max(right, rect.right)
-    return right
-  }
-  const wallRightOf = (el) => {
-    const own = el.getBoundingClientRect()
-    let stop = limitOf(el)
-    for (let up = el; up && up !== document.body; up = up.parentElement) {
-      for (let sibling = up.nextElementSibling; sibling; sibling = sibling.nextElementSibling) {
-        const rect = sibling.getBoundingClientRect()
-        if (!rect.width || rect.top >= own.bottom - 1 || rect.bottom <= own.top + 1) continue
-        if (rect.left >= own.right - 1) stop = Math.min(stop, rect.left)
-      }
-    }
-    return stop
-  }
-  const selfClips = (el) => {
-    const style = getComputedStyle(el)
-    return style.overflowX !== 'visible' || style.textOverflow === 'ellipsis'
+  // The rule lives in the product. renderer/text-fit.js is loaded by index.html
+  // and used by the card's own fitNumber, so this check asks exactly the question
+  // the card answers — ink past the wall it could hit, the nearest ancestor allowed
+  // to clip or the next element on the same line. Having its own copy of the
+  // measurement is what let the check and the product disagree for six rounds, and
+  // a green run that grades a fiction is worse than a red one. (No backticks in
+  // this file's comments: MEASURE is itself a template literal.)
+  if (typeof TmTextFit === 'undefined') {
+    throw new Error('renderer/text-fit.js is not loaded: the check cannot measure what the card measures')
   }
   for (const el of document.querySelectorAll('body *')) {
     if (!visible(el) || el.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue
     const own = [...el.childNodes].filter((n) => n.nodeType === 3)
       .map((n) => n.nodeValue.trim()).join(' ').trim()
     if (!own) continue
-    const spill = selfClips(el) && el.scrollWidth > el.clientWidth + 1
-    const wall = wallRightOf(el)
-    const ink = inkRightOf(el)
-    const pastEdge = ink > wall + 1
-    if (!spill && !pastEdge) continue
+    const verdict = TmTextFit.escape(el)
+    if (!verdict.escaped) continue
     out.push({
       where: el.id || (typeof el.className === 'string' && el.className.split(' ')[0]) || el.tagName,
       text: own.slice(0, 60),
       // Without these, a remote failure on a runner nobody has locally is a
       // guess: the inline size shows whether the app's own fitting ran, box shows
-      // what it measured against, and ink/wall say what the reader actually loses.
+      // what it measured against, and ink/ownBox say what the reader actually loses.
       fit: el.style.fontSize || 'none',
       size: getComputedStyle(el).fontSize,
-      box: [el.clientWidth, el.scrollWidth],
-      ink: Math.round(ink - wall),
-      clippedBySelf: spill,
-      pixels: Math.round(Math.max(spill ? el.scrollWidth - el.clientWidth : 0, ink - wall))
+      box: verdict.box,
+      ink: verdict.ink,
+      ownBox: verdict.ownBox,
+      clippedBySelf: verdict.selfClipped,
+      pixels: verdict.pixels
     })
   }
   // The engagement witness is captured in the same task as the clip list, not

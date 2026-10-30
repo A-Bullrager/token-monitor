@@ -131,5 +131,18 @@ for (const locale of locales) {
 assert.ok(/i18n\.LOCALES\.filter[\s\S]{0,160}require\(`\.\/renderer\/locales\/\$\{locale\}`\)/.test(main),
   'main.js must register every locale dictionary (tray and menus are built there, not in the renderer)')
 
+// The fitting rule has the same failure mode as an unregistered dictionary: if the
+// page does not load it, the card and the two checks quietly stop measuring the
+// same thing, and nothing except a red CI round will say so.
+const app = fs.readFileSync(path.join(root, 'renderer', 'app.js'), 'utf8')
+assert.ok(html.includes('src="text-fit.js"'), 'renderer/index.html never loads text-fit.js')
+assert.ok(html.indexOf('text-fit.js') < html.indexOf('app.js'),
+  'text-fit.js must load before app.js, which calls it while rendering')
+assert.ok(/TmTextFit\.escape\(/.test(app), 'app.js must fit numbers through TmTextFit.escape, not a private copy')
+for (const checker of ['number-fit.mjs', 'i18n-check.mjs']) {
+  const source = fs.readFileSync(path.join(root, 'scripts', checker), 'utf8')
+  assert.ok(/TmTextFit\.escape\(/.test(source), `scripts/${checker} must grade with TmTextFit.escape`)
+}
+
 assert.deepEqual(i18n.untranslated, [], `untranslated strings collected: ${JSON.stringify(i18n.untranslated)}`)
 console.log(`Dictionary parity OK: ${locales.join(', ')} — ${JSON.stringify(report)}`)

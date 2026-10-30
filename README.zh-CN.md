@@ -281,14 +281,14 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 - 每次使用独立、含中文与空格的 profile，检查配置落盘；遍历浅色条带、浅色账本、设置、深色账本四个状态。
 - 余额、跑道、今日花费与 `zh-CN` 基准逐字符串比较；tokens 按数值比较，并按每种语言自己的分组习惯解析（`1096 万`、`11M`、`11 M`、`11 Mio.`）；不要求时钟、日期与日期相关标签相同。
 - 检查 Inter / MiSans 的 FontFace 状态：中文模式下两者都必须已加载，翻译模式下 MiSans 允许保持 `unloaded`（屏幕没有中文，浏览器按需加载本就不取它，这不是缺陷）；采集的 DOM 字符必须属于 `scripts/font-corpus.txt`；中文模式还通过 CDP `CSS.getPlatformFontsForNode` 读取「会话」标签实际命中的平台字体，确认它使用打包的 MiSans 子集（Windows 实测：修复前落到系统 NSimSun，Linux runner 上直接显示方框）。
-- **每个可见标签都会与自己的盒子尺寸比对**（`scrollWidth` 与最近的裁剪祖先），因为语言变长时文字明明翻译正确、却被切掉一半，而字符类检查完全看不见这一点。它会一次性报告所有场景而不是在第一个就停下——字体度量按操作系统不同：同一行在 Windows 与 Linux 都装得下，在 macOS 上却溢出 12 像素，英文措辞正是这样被发现并改短的。
+- **每个可见标签都按同一条规则量**——`renderer/text-fit.js` 由页面加载、也由卡片自己调用：文字自己的墨迹必须留在它可能撞到的那堵墙之内（最近的裁剪祖先，或同一行里在它右边开始的下一个元素）；若元素自己裁字，就按它自己的盒子量，因为语言变长时文字明明翻译正确、却被切掉一半，而字符类检查完全看不见这一点。它会一次性报告所有场景而不是在第一个就停下——字体度量按操作系统不同：同一行在 Windows 与 Linux 都装得下，在 macOS 上却溢出 12 像素，英文措辞正是这样被发现并改短的。
 
 这些检查**不证明字体 cmap 完整覆盖、所有 fallback 字形、原生菜单、其他宿主 OS 语言版本或真实密钥加密**；语言测试本身不填写凭证，也不做加解密往返。
 token 数量的分组与紧凑记数按语言走（`1096 万` / `11M` / `11 M` / `11 Mio.`），金额与时钟仍统一用点号小数和 24 小时制。
 
 ## GitHub Actions 与发布
 
-工作流见 [`.github/workflows/build.yml`](.github/workflows/build.yml)。四个 runner 都跑过真实构建，Release 路径也已经发布过五次——v2.4.1、v2.5.0、v2.6.0、v2.6.1、v2.6.2。
+工作流见 [`.github/workflows/build.yml`](.github/workflows/build.yml)。四个 runner 都跑过真实构建，Release 路径也已经发布过五次——v2.4.1、v2.5.0、v2.6.0、v2.6.1、v2.6.2。每周对 `main` 定时跑一轮，好在没有发布正等着结果的时候抓到 runner 镜像的漂移；Electron 与 electron-builder 的下载按平台与 lockfile 缓存，此前冷 runner 每次要先重新拉约 100MB 才开始干活；发布之后，Release job 还会拿构建出的文件复核资产清单、GitHub 公布的摘要与 `SHA256SUMS.txt`。
 本地 `git commit` 不会触发云端任务；需要 push、PR 或手动触发。GitHub Packages 面向 npm / 容器等包仓库，本项目的桌面程序使用 Artifacts 和 Release 附件分发。
 
 | 触发方式 | 行为 |

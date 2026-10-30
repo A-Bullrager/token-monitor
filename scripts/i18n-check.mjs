@@ -142,33 +142,31 @@ const COLLECT = `(() => {
     })(),
     untranslated: window.TmI18n ? window.TmI18n.untranslated.slice() : null,
     // Longer languages overflow the instrument's fixed geometry, and a clipped
-    // label is a localisation bug that no character check can see. Measure it:
-    // text whose box is too small for it, or that runs past the nearest
-    // clipping ancestor.
+    // label is a localisation bug that no character check can see. The rule is the
+    // product's own — renderer/text-fit.js, loaded by index.html and used by
+    // fitNumber — because a check that measures the element box instead of the ink
+    // reports spill into empty space as a defect, and had the card shrinking
+    // numbers no reader was losing.
     clipped: (() => {
       const out = []
-      const limitOf = (el) => {
-        for (let node = el; node; node = node.parentElement) {
-          const style = getComputedStyle(node)
-          if (style.overflowX === 'visible' && style.textOverflow !== 'ellipsis') continue
-          const box = node.getBoundingClientRect()
-          return box.right - (parseFloat(style.paddingRight) || 0)
-        }
-        return window.innerWidth
+      if (typeof TmTextFit === 'undefined') {
+        throw new Error('renderer/text-fit.js is not loaded: the check cannot measure what the card measures')
       }
       for (const el of document.querySelectorAll('body *')) {
         if (!visible(el) || el.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue
         const own = [...el.childNodes].filter((n) => n.nodeType === 3)
           .map((n) => n.nodeValue.trim()).join(' ').trim()
         if (!own) continue
-        const overflowed = el.scrollWidth > el.clientWidth + 1
-        const pastEdge = el.getBoundingClientRect().right > limitOf(el) + 1
-        if (!overflowed && !pastEdge) continue
+        const verdict = TmTextFit.escape(el)
+        if (!verdict.escaped) continue
         out.push({
           where: el.id || (typeof el.className === 'string' ? el.className.split(' ')[0] : el.tagName),
           text: own.slice(0, 46),
-          pixels: Math.max(overflowed ? el.scrollWidth - el.clientWidth : 0,
-            Math.round(el.getBoundingClientRect().right - limitOf(el)))
+          pixels: verdict.pixels,
+          ink: verdict.ink,
+          ownBox: verdict.ownBox,
+          fit: el.style.fontSize || 'none',
+          size: getComputedStyle(el).fontSize
         })
       }
       return out.slice(0, 10)

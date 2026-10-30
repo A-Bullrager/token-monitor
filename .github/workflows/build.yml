@@ -6,6 +6,13 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
+  schedule:
+    # The runner images move under this project without warning, and the history is
+    # full of findings that only an OS-level change can produce: hdiutil detach
+    # races, font metrics arriving after first paint, a window manager resizing on
+    # its own schedule. A weekly run against main catches that drift while there is
+    # no release waiting on the answer. The release job stays gated on a tag push.
+    - cron: '17 6 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -41,13 +48,33 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Cache Electron and electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          # Every round a cold runner re-downloaded the ~100MB Electron binary and
+          # dmg-builder's Python tooling before running anything — and two Apple
+          # Silicon rounds failed in the minute they spent doing it, with
+          # "Downloading Electron binary..." as the last honest line in the log.
+          # These are the four platforms' own cache directories; a path that does
+          # not exist on a runner is skipped, not an error. The key is the
+          # lockfile hash and the architecture, so a dependency change cannot
+          # restore a stale binary, and nothing here is reused across platforms.
+          path: |
+            ${{ runner.home }}/.cache/electron
+            ${{ runner.home }}/.cache/electron-builder
+            ${{ runner.home }}/Library/Caches/electron
+            ${{ runner.home }}/Library/Caches/electron-builder
+            ${{ runner.home }}/AppData/Local/electron/Cache
+            ${{ runner.home }}/AppData/Local/electron-builder/Cache
+          key: electron-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-${{ runner.os }}-${{ matrix.arch }}-
       - name: Check host, version and docs
         shell: bash
         run: |
           node -e "if(process.platform!==process.env.EXPECTED_PLATFORM||process.arch!==process.env.EXPECTED_ARCH)throw Error('Runner architecture mismatch')"
           npm run check:release
           npm run check:docs
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       - run: npm run icons
       - name: Install Linux display dependencies
         if: runner.os == 'Linux'
@@ -111,7 +138,13 @@ jobs:
             release/*.dmg
             release/*.AppImage
           if-no-files-found: error
-          retention-days: 14
+          # A full matrix costs ~600MB of storage, and the release job consumes its
+          # input within minutes of the run: 278 artifacts, 8.9GB, after a day of
+          # ordinary rounds on a 14-day policy. Keep a two-week audit trail for the
+          # run that actually published a release, and three days of grab-able
+          # development builds otherwise — the README promises the latter, not the
+          # former.
+          retention-days: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) && 14 || 3 }}
           compression-level: 0
       - name: Upload test diagnostics
         if: always()
@@ -132,6 +165,7 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -153,8 +187,12 @@ jobs:
         shell: bash
         run: |
           # Keep incomplete uploads in a draft. Never replace an existing public release.
-          if gh release view "$GITHUB_REF_NAME" --json isDraft > release-state.json 2>/dev/null; then
-            node -e "if(!require('./release-state.json').isDraft) throw Error('Release already published; use a new version tag')"
+          # The state file goes in its own directory: an earlier draft of this step
+          # wrote it next to the assets, and one added `working-directory` would have
+          # published that scratch JSON as a release asset.
+          state=$(mktemp -d)
+          if gh release view "$GITHUB_REF_NAME" --json isDraft > "$state/release-state.json" 2>/dev/null; then
+            node -e "if(!require('$state/release-state.json').isDraft) throw Error('Release already published; use a new version tag')"
           else
             gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Token Monitor $GITHUB_REF_NAME" --generate-notes
           fi
@@ -164,3 +202,39 @@ jobs:
           else
             gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease=false --latest
           fi
+      - name: Confirm the published asset set is exactly what was built
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # The job is not done when gh says OK: this is the same cross-check that
+          # was done by hand after every release — six packages plus the checksum
+          # list, the published digests matching the files the runners built, and
+          # SHA256SUMS.txt itself agreeing with them, because that list is the only
+          # thing a reader has to trust a download with. No apostrophes inside: the
+          # script is passed in one single-quoted shell string.
+          node -e '
+          const crypto = require("node:crypto")
+          const fs = require("node:fs")
+          const { execFileSync } = require("node:child_process")
+          const version = process.env.GITHUB_REF_NAME.slice(1)
+          const packages = ["win-x64.zip", "linux-x64.AppImage", "mac-arm64.dmg", "mac-arm64.zip", "mac-x64.dmg", "mac-x64.zip"]
+            .map((suffix) => `token-monitor-${version}-${suffix}`)
+          const want = [...packages, "SHA256SUMS.txt"].sort()
+          const released = JSON.parse(execFileSync("gh", ["release", "view", process.env.GITHUB_REF_NAME, "--json", "assets,isDraft,prerelease"], { encoding: "utf8" }))
+          const names = released.assets.map((asset) => asset.name).sort()
+          if (released.isDraft || released.prerelease) throw Error("published release is still a draft or a prerelease")
+          const missing = want.filter((name) => !names.includes(name))
+          const extra = names.filter((name) => !want.includes(name))
+          if (missing.length || extra.length) throw Error(`asset set wrong: missing ${missing} extra ${extra}`)
+          const published = new Map(released.assets.map((asset) => [asset.name, asset.digest]))
+          const built = new Map(packages.map((name) => [name, crypto.createHash("sha256").update(fs.readFileSync(`downloads/${name}`)).digest("hex")]))
+          const wrongDigests = packages.filter((name) => published.get(name) !== `sha256:${built.get(name)}`)
+          if (wrongDigests.length) throw Error(`published digests differ from the built files: ${wrongDigests}`)
+          const listed = new Map(fs.readFileSync("downloads/SHA256SUMS.txt", "utf8").trim().split(/\r?\n/)
+            .map((line) => line.trim().split(/\s+/)).map(([hash, file]) => [file, hash]))
+          const wrongList = packages.filter((name) => listed.get(name) !== built.get(name))
+          if (wrongList.length) throw Error(`SHA256SUMS.txt does not match the built files: ${wrongList}`)
+          console.log(`Published ${names.length} assets; digests and SHA256SUMS.txt both match the files the runners built.`)
+          '

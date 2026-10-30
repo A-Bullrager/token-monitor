@@ -331,47 +331,14 @@ function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   node.style.fontSize = ''
   const base = parseFloat(getComputedStyle(node).fontSize)
   if (!Number.isFinite(base)) return
-  // The right edge of the ink, and the wall the ink would run into — the nearest
-  // ancestor allowed to clip, or the first element that begins to the right of
-  // this one on the same line. Text that spills past its own slot while empty
-  // space follows it is not something the reader loses, and treating it as one had
-  // the fitter shrinking a German ledger line to 5.5px and a headline balance to
-  // half its designed size to move edges that no font size can move.
-  const limitRight = () => {
-    for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-      const style = getComputedStyle(parent)
-      if (style.overflowX === 'visible' && style.textOverflow !== 'ellipsis') continue
-      return parent.getBoundingClientRect().right - (parseFloat(style.paddingRight) || 0)
-    }
-    return window.innerWidth
-  }
-  const ownRect = node.getBoundingClientRect()
-  const wallRight = () => {
-    let stop = limitRight()
-    for (let up = node; up && up !== document.body; up = up.parentElement) {
-      for (let sibling = up.nextElementSibling; sibling; sibling = sibling.nextElementSibling) {
-        const rect = sibling.getBoundingClientRect()
-        if (!rect.width || rect.top >= ownRect.bottom - 1 || rect.bottom <= ownRect.top + 1) continue
-        if (rect.left >= ownRect.right - 1) stop = Math.min(stop, rect.left)
-      }
-    }
-    return stop
-  }
-  const inkRight = () => {
-    const range = document.createRange()
-    range.selectNodeContents(node)
-    const rects = range.getClientRects()
-    if (!rects.length) return ownRect.right
-    let right = 0
-    for (const rect of rects) right = Math.max(right, rect.right)
-    return right
-  }
-  const ownStyle = getComputedStyle(node)
-  const selfClips = ownStyle.overflowX !== 'visible' || ownStyle.textOverflow === 'ellipsis'
-  const overflows = () => (selfClips && node.scrollWidth > node.clientWidth + 1) ||
-    inkRight() > wallRight() + 1
+  // One rule, in renderer/text-fit.js, shared with the number check and the
+  // language check: the ink has to stay inside the wall it could hit — the nearest
+  // ancestor allowed to clip, or the first element beginning to the right on the
+  // same line. When each party kept its own copy they drifted apart, and the card
+  // spent six CI rounds shrinking numbers the reader could already see in full.
+  const escaped = () => TmTextFit.escape(node).escaped
   let scale = 1
-  for (let step = 0; step < steps && overflows(); step++) {
+  for (let step = 0; step < steps && escaped(); step++) {
     scale = Math.max(floor, scale - 0.12)
     node.style.fontSize = `${+(base * scale).toFixed(2)}px`
     if (scale === floor) break
