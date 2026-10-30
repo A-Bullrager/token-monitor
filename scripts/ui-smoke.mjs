@@ -466,9 +466,17 @@ try {
     const winFrom = wins[0]
     const winTo = wins.at(-1)
     let panelChanges = 0
+    const panelMoves = []
     for (let i = 1; i < run.samples.length; i++) {
       if (!run.samples[i].morphing) continue
-      if (run.samples[i].panel !== run.samples[i - 1].panel) panelChanges++
+      if (run.samples[i].panel === run.samples[i - 1].panel) continue
+      panelChanges++
+      // Which frames, and what the window was doing then: a pin that lands one
+      // frame late looks the same as a reflow in the count alone, and this
+      // assertion failing on three platforms at once while passing locally is
+      // exactly the case that has to be diagnosable from the artifact.
+      panelMoves.push({ i, t: run.samples[i].t, from: run.samples[i - 1].panel, to: run.samples[i].panel,
+        win: [run.samples[i - 1].win, run.samples[i].win], morphingBefore: run.samples[i - 1].morphing })
     }
     return {
       duration: boot.morphMs,
@@ -490,6 +498,7 @@ try {
       // resize is cheap; re-laying-out the whole card on every step is what made
       // the content trail the edge by 60-100ms, so the architecture is graded.
       panelChanges,
+      panelMoves,
       dimmest: Math.min(...frameWindow.map((s) => Math.max(s.so, s.dop))),
       deckHeights: [Math.min(...frameWindow.map((s) => s.deck)), Math.max(...frameWindow.map((s) => s.deck))],
       stripHeights: [Math.min(...frameWindow.map((s) => s.strip)), Math.max(...frameWindow.map((s) => s.strip))]
@@ -532,7 +541,7 @@ try {
   // architecture exists to prevent, so it is graded, not just described.
   assert.ok(
     graded.panelChanges <= 1,
-    `the card was re-laid-out ${graded.panelChanges} times during one morph; it must be pinned and revealed`
+    `the card was re-laid-out ${graded.panelChanges} times during one morph; it must be pinned and revealed — ${JSON.stringify(graded.panelMoves)}`
   )
   assert.ok(
     graded.dimmest > 0.45,
