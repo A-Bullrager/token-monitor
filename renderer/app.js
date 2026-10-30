@@ -96,7 +96,7 @@ const state = {
   switching: false,
   loading: true,
   error: '',
-  version: '2.6.2',
+  version: '2.7.0',
   clearArmed: false,
   clearTimer: null,
   refreshTimer: null,

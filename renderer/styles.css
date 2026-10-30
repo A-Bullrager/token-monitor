@@ -7,11 +7,22 @@
 }
 
 @font-face {
-  font-family: "MiSans";
-  src: url("assets/font/MiSans-subset.woff2") format("woff2");
-  font-weight: 150 700;
+  font-family: "Noto Sans SC";
+  src: url("assets/font/NotoSansSC-subset.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
+  /* The interface's line boxes are decided here, not by whichever face happens
+     to answer Chinese. Noto's own hhea is 1160/-288 (1.448em); the face this
+     layout grew up with carried 1044/-282 (1.326em), and every element that
+     does not declare a line-height takes its `normal` from the font. Measured
+     across 119 text elements, letting Noto answer at its own metrics moved
+     nothing sideways but made 46 of them 0.66-1.34px taller each, up to +12px
+     by the bottom of the settings panel. Declaring the metrics keeps the swap
+     pixel-neutral and keeps the rhythm from changing again with the next face. */
+  ascent-override: 104.4%;
+  descent-override: 28.2%;
+  line-gap-override: 0%;
 }
 
 :root {
@@ -42,9 +53,9 @@
   --stage-caption: #ffffff;
   --stage-muted: rgba(255, 255, 255, 0.72);
   --serif: var(--sans);
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, "MiSans", monospace;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, "Noto Sans SC", monospace;
   --sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
-    "Segoe UI", "MiSans", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+    "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif;
   --switch-on: #34c759;
 }
 
@@ -2066,8 +2077,10 @@ body.theme-dark .grain {
   color: var(--muted);
 }
 
-/* Font attribution required by the MiSans agreement; kept on one small line
-   so the settings drawer still fits without scrolling. */
+/* Font attribution. Both bundled faces are SIL OFL 1.1 and their licence text
+   travels in renderer/assets/font/licenses/, which is what the licence actually
+   asks for; this line is our own choice, kept on one small line so the settings
+   drawer still fits without scrolling. */
 .set-note.credit {
   margin-top: 4px;
   font-size: 7.5px;
@@ -2635,6 +2648,15 @@ body.theme-dark .panel::before {
 .seg-wrap {
   width: 100%;
   flex-wrap: wrap;
+}
+
+/* A chip is a chip whatever script its label is in. Without this the height
+   comes from `normal`, which is Inter's 1.21em for "English" and the Chinese
+   face's 1.326em for "中文" — and because flex items stretch, one CJK chip made
+   the whole first row 2px taller than the row below it. 1.326 is the height
+   every Chinese-labelled chip already had. */
+.seg button {
+  line-height: 1.326;
 }
 
 .seg-wrap button {

@@ -131,11 +131,16 @@ const COLLECT = `(() => {
     // them; non-empty in Chinese mode by design.
     cjk: (() => {
       const found = new Set()
+      // A language picker names each language in its own script, so 中文 is on
+      // screen in every language on purpose. The list lives in the renderer, so
+      // the product and this scan cannot disagree about what is deliberate.
+      const keep = (window.TmI18n && window.TmI18n.NATIVE_SCRIPT_NAMES) || []
       const scan = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
       let text
       while ((text = scan.nextNode())) {
         const host = text.parentElement
         if (!host || !visible(host)) continue
+        if (keep.includes(text.nodeValue.trim())) continue
         for (const ch of text.nodeValue) if (/[\\u4e00-\\u9fff]/.test(ch)) found.add(ch)
       }
       return [...found].join('')
@@ -191,7 +196,7 @@ const COLLECT = `(() => {
     },
     fonts: {
       interLoaded: document.fonts.check('600 16px Inter'),
-      misansLoaded: document.fonts.check('400 12px MiSans'),
+      cjkLoaded: document.fonts.check('400 12px "Noto Sans SC"'),
       faces: [...document.fonts].map((face) => ({
         family: face.family.replace(/["']/g, ''), weight: face.weight, status: face.status
       }))
@@ -258,15 +263,15 @@ function validateState(scenario, state, data) {
     data.ui.settingsOpen === expected.settingsOpen &&
     data.ui.settingsAriaHidden === String(!expected.settingsOpen) && data.ui.demoVisible,
   `${label}: unexpected actual UI state: ${JSON.stringify(data.ui)}`)
-  for (const [family, loaded] of [['Inter', data.fonts.interLoaded], ['MiSans', data.fonts.misansLoaded]]) {
+  for (const [family, loaded] of [['Inter', data.fonts.interLoaded], ['Noto Sans SC', data.fonts.cjkLoaded]]) {
     // FontFaceSet.check can succeed even when the requested family is absent,
-    // so the face status is inspected as well. MiSans is only *required* where
-    // Chinese is on screen: with no CJK glyph in use, the browser legitimately
-    // never fetches it and the face stays "unloaded".
+    // so the face status is inspected as well. The Chinese face is only
+    // *required* where Chinese is on screen: with no CJK glyph in use, the
+    // browser legitimately never fetches it and the face stays "unloaded".
     const required = family === 'Inter' || expectedUi === 'zh'
     if (!required) {
       assert(!loaded || data.fonts.faces.some((face) => face.family === family && face.status === 'loaded'),
-        `${label}: MiSans reported loaded without a loaded face: ${JSON.stringify(data.fonts)}`)
+        `${label}: ${family} reported loaded without a loaded face: ${JSON.stringify(data.fonts)}`)
       continue
     }
     assert(loaded && data.fonts.faces.some((face) => face.family === family && face.status === 'loaded'),
@@ -420,7 +425,9 @@ async function runScenario(scenario) {
         placeholder: getComputedStyle(document.getElementById('sessionInput'), '::placeholder').fontFamily
       })`)
       for (const [element, family] of Object.entries(families)) {
-        assert(family.includes('MiSans'), `${scenario.name}: ${element} needs bundled CJK font fallback: ${family}`)
+        // getComputedStyle keeps the quotes around a multi-word family.
+        assert(family.replace(/["']/g, '').includes('Noto Sans SC'),
+          `${scenario.name}: ${element} needs bundled CJK font fallback: ${family}`)
       }
       // FontFaceSet.check does not prove that a label actually uses the font.
       // Inspect a real Chinese label, without changing the DOM or installing
@@ -431,8 +438,8 @@ async function runScenario(scenario) {
       const { nodeId } = await call('DOM.querySelector', { nodeId: documentNode.nodeId, selector: '#connSession' })
       const { fonts } = await call('CSS.getPlatformFontsForNode', { nodeId })
       entry.monospaceCjk = { families, fonts }
-      assert(fonts.some(font => font.isCustomFont && /MiSans/i.test(font.familyName) && font.glyphCount >= 2),
-        `${scenario.name}: Chinese status label did not use bundled MiSans: ${JSON.stringify(fonts)}`)
+      assert(fonts.some(font => font.isCustomFont && /Noto Sans SC/i.test(font.familyName) && font.glyphCount >= 2),
+        `${scenario.name}: Chinese status label did not use the bundled Noto Sans SC subset: ${JSON.stringify(fonts)}`)
     }
     const verifyConfig = async (theme) => {
       assert(fs.existsSync(entry.configFile), `${scenario.name}: config.json was not written in its CJK profile`)

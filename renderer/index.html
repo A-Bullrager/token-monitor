@@ -328,14 +328,14 @@
             <p class="set-note">浅色是默认外观；深色适合夜间或深色桌面。</p>
             <div class="field inline">
               <span class="field-label"><span class="micro">LANGUAGE</span></span>
-              <!-- Native names, ASCII where the shipped subset cannot do better:
-                   MiSans has no 语 / 言 glyphs, so the Chinese option stays
-                   "Chinese" instead of "中文". Everything else uses its own
-                   spelling, and scripts/glyph-demand.mjs proves the bundled
-                   Inter subset carries the accents these names need. -->
+              <!-- Native names: every option is written in the language it
+                   selects. This needs 文, which the bundled Chinese face must
+                   carry — scripts/glyph-demand.mjs proves the dictionaries
+                   never ask for a character outside scripts/font-corpus.txt,
+                   and scripts/subset-font.py cuts the subset from that file. -->
               <div class="seg seg-wrap" id="localeSeg" role="group" aria-label="LANGUAGE">
                 <button type="button" data-locale="auto">Auto</button>
-                <button type="button" data-locale="zh">Chinese</button>
+                <button type="button" data-locale="zh">中文</button>
                 <button type="button" data-locale="en">English</button>
                 <button type="button" data-locale="es">Español</button>
                 <button type="button" data-locale="pt-BR">Português</button>
@@ -356,8 +356,8 @@
 
           <section class="set-section about">
             <h3>关于</h3>
-            <p class="set-note">Token Monitor <span id="versionText">v2.6.2</span> · 本地优先 · 非官方 DeepSeek 客户端。余额来自官方 API；用量来自平台会话接口，可能随平台调整。</p>
-            <p class="set-note credit">Fonts: Inter (SIL OFL 1.1) · MiSans (Xiaomi, royalty-free commercial license)</p>
+            <p class="set-note">Token Monitor <span id="versionText">v2.7.0</span> · 本地优先 · 非官方 DeepSeek 客户端。余额来自官方 API；用量来自平台会话接口，可能随平台调整。</p>
+            <p class="set-note credit">Fonts: Inter (SIL OFL 1.1) · Noto Sans SC (SIL OFL 1.1)</p>
             <div class="set-actions space">
               <button class="text-btn" type="button" id="footerUsage">平台用量页 ↗</button>
               <button class="text-btn danger" type="button" id="clearBtn">清除凭证</button>

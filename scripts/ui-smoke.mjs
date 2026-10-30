@@ -284,7 +284,7 @@ try {
     ringKnob: document.querySelectorAll('#gaugeSvg .ring-knob').length,
     fonts: {
       inter: document.fonts.check('600 16px Inter'),
-      misans: document.fonts.check('400 12px MiSans')
+      cjk: document.fonts.check('400 12px "Noto Sans SC"')
     },
     band: document.querySelectorAll('#chart .last7-band').length,
     scroll: (() => {
@@ -315,7 +315,7 @@ try {
   assert.equal(report.firstLaunch.deck.ringProgress, 1)
   assert.equal(report.firstLaunch.deck.ringKnob, 1)
   assert.equal(report.firstLaunch.deck.fonts.inter, true)
-  assert.equal(report.firstLaunch.deck.fonts.misans, true)
+  assert.equal(report.firstLaunch.deck.fonts.cjk, true)
   assert.equal(report.firstLaunch.deck.band, 1)
   const deckScroll = report.firstLaunch.deck.scroll
   assert.ok(deckScroll.client > 0 && deckScroll.clientWidth > 0, 'deck must have a usable scroll area')

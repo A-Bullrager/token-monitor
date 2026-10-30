@@ -33,6 +33,17 @@ const reference = i18n.dictionary(REFERENCE)
 assert.ok(reference, `the ${REFERENCE} dictionary must exist as the reference`)
 assert.ok(Object.keys(reference.exact).length > 100, `${REFERENCE} looks truncated: ${Object.keys(reference.exact).length} keys`)
 
+// A native-script name is on screen in every language, so the one thing that
+// must hold for it is that the bundled fonts can actually draw it: the corpus
+// is what the subsets were cut from.
+const nativeNames = i18n.NATIVE_SCRIPT_NAMES
+const corpusText = fs.readFileSync(path.join(root, 'scripts', 'font-corpus.txt'), 'utf8')
+for (const name of nativeNames) {
+  const outside = [...name].filter((ch) => !corpusText.includes(ch))
+  assert.deepEqual(outside, [],
+    `i18n.NATIVE_SCRIPT_NAMES shows ${JSON.stringify(name)} in every language, but ${outside.join('')} is outside scripts/font-corpus.txt`)
+}
+
 const report = {}
 for (const locale of locales) {
   const dictionary = i18n.dictionary(locale)
@@ -53,7 +64,13 @@ for (const locale of locales) {
 
   for (const [key, value] of Object.entries(dictionary.exact)) {
     assert.ok(typeof value === 'string' && value.trim(), `${locale}: empty translation for ${JSON.stringify(key)}`)
+    // No translation may come back in Chinese, and no string that the renderer
+    // has declared a native-script name may sneak in as a dictionary entry:
+    // i18n.translate() answers those before the dictionary is consulted, so an
+    // entry here would be dead code that reads like a translation.
     assert.ok(!i18n.CJK.test(value), `${locale}: ${JSON.stringify(key)} was "translated" into Chinese`)
+    assert.ok(!i18n.NATIVE_SCRIPT_NAMES.includes(key),
+      `${locale}: ${JSON.stringify(key)} is a native-script name; it belongs to i18n.NATIVE_SCRIPT_NAMES, not to a dictionary`)
     const rendered = i18n.translate(key, locale)
     assert.ok(!i18n.CJK.test(rendered), `${locale}: ${JSON.stringify(key)} still renders Chinese: ${JSON.stringify(rendered)}`)
   }

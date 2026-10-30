@@ -181,7 +181,7 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 - **单复数属于语言**：中文不标记语法数量，所以每种语言各自变化被计数的名词（`1 día activo` / `15 días activos`、`1 Tag` / `15 Tage`）。一致性检查会拒绝「单数与复数长得一样」的词典，并把测量值 `1.0` 视为复数。
 - **已知边界**：金额在任何语言都保持同一套小数点写法（`¥145.09`），时钟同理；只有 token 数量按语言自身的分组习惯显示。切换语言会保存设置并**重新加载窗口**——这是唯一会触发重载的选项，因为已经写进页面的文字无法就地再翻译一遍。
 
-**一个真实的字体约束**：随应用打包的是裁剪过的字体子集。MiSans 子集按固定语料裁剪，里面**没有** 语 / 言 / 英 / 文 四个字，因此新中文文案必须落回 `scripts/font-corpus.txt`——语言行也因此用 ASCII 的 `LANGUAGE`，中文选项写作 `Chinese` 而不是 `中文`。新语言需要的变音字母（`Á Ã Ç É Í Ó Ø Ú Ü ß á ã ä ç é ê í ñ ó ô õ ö ú ü`）已用 fontTools 对照 Inter 子集的真实 cmap 逐个核对；`scripts/glyph-demand.mjs` 会在任何窗口打开之前，因词典索取语料之外的字符而失败。`npm run test:i18n` 再对屏幕上真正出现的字符复核一次语料归属——这条检查曾经抓到真问题：等宽标签在 Linux runner 上显示方框，因为字体栈缺少随应用打包的中文回退。
+**一个真实的字体约束**：随应用打包的是裁剪过的字体子集。中文子集按 `scripts/font-corpus.txt` 裁剪，因此新中文文案必须落回这份语料——`scripts/glyph-demand.mjs` 会在任何窗口打开之前，因词典索取语料之外的字符而失败。新语言需要的变音字母（`Á Ã Ç É Í Ó Ø Ú Ü ß á ã ä ç é ê í ñ ó ô õ ö ú ü`）已用 fontTools 对照 Inter 子集的真实 cmap 逐个核对。`npm run test:i18n` 再对屏幕上真正出现的字符复核一次语料归属——这条检查曾经抓到真问题：等宽标签在 Linux runner 上显示方框，因为字体栈缺少随应用打包的中文回退。2.7.0 之前这条约束是看得见的：MiSans 子集里没有「文」，语言选项只能写 `Chinese`；现在它写 `中文`，并且在任何一种界面语言下都这样——子集里有这个字，`scripts/subset-font.py` 就是裁出它的那一步。
 
 ## 测试与验证范围
 
@@ -196,7 +196,7 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 
 **云端第二轮（`4fb1d4d`）：** Windows x64 仍全绿；Linux 语言测试转绿，失败点变成打包文件名——electron-builder 实际产出 `linux-x86_64.AppImage`，与验包脚本和 Release 契约要求的 `linux-x64` 不一致；两个 macOS 架构仍在同一处超时，但这次带回了进程栈证据：主线程 80/80 次采样停在 `SecItemCopyMatching → SecurityServer → mach_msg`，即启动路径上的**同步钥匙串读取**把主进程整条挂死（源码测试用未签名 Electron，其钥匙串条目在 runner 上已授权，所以只有打包应用会撞上）。
 
-**据此做的修复：** 退出竞态只放行该一种情况且仍要求进程以 0 退出；等宽标签补上打包的 MiSans 回退并用 CDP 校验真实生效字体；Linux 产物名固定为 `linux-x64`；钥匙串探测改为「打开设置时异步发起」，启动路径不再触碰（见「安全与本地配置」）。
+**据此做的修复：** 退出竞态只放行该一种情况且仍要求进程以 0 退出；等宽标签补上随应用打包的中文字体回退（2.7.0 及之前是 MiSans，之后是思源黑体）并用 CDP 校验真实生效字体；Linux 产物名固定为 `linux-x64`；钥匙串探测改为「打开设置时异步发起」，启动路径不再触碰（见「安全与本地配置」）。
 
 **云端第三轮（`de0c757`）：** Windows x64、Linux x64（AppImage 解包后真实启动）、macOS Apple Silicon（DMG + ZIP 构建、严格验签、ZIP 解包与 DMG 复制安装后启动校验）三组全绿；macOS Intel 只在生成 DMG 时失败——`dmgbuild` 收尾的 `hdiutil detach` 撞上「Resource busy」，同一步的 ZIP 已经产出，同配置的 arm64 在同一提交上通过，属于 runner 上的竞态而非打包配置错误，因此给该步骤加了最多三次、只清理自己卷标的有界重试。
 
@@ -288,7 +288,7 @@ Linux 的 `basic_text`、`unknown` 及其他不受认可或不可用的后端均
 - 再加三次手动覆盖：在 `zh-CN` 下强制英文、在 `en-US` 下强制中文、在 `de-DE` 下强制西班牙语，验证选择器能压过浏览器语言——这正是设置里那个选项做的事。
 - 每次使用独立、含中文与空格的 profile，检查配置落盘；遍历浅色条带、浅色账本、设置、深色账本四个状态。
 - 余额、跑道、今日花费与 `zh-CN` 基准逐字符串比较；tokens 按数值比较，并按每种语言自己的分组习惯解析（`1096 万`、`11M`、`11 M`、`11 Mio.`）；不要求时钟、日期与日期相关标签相同。
-- 检查 Inter / MiSans 的 FontFace 状态：中文模式下两者都必须已加载，翻译模式下 MiSans 允许保持 `unloaded`（屏幕没有中文，浏览器按需加载本就不取它，这不是缺陷）；采集的 DOM 字符必须属于 `scripts/font-corpus.txt`；中文模式还通过 CDP `CSS.getPlatformFontsForNode` 读取「会话」标签实际命中的平台字体，确认它使用打包的 MiSans 子集（Windows 实测：修复前落到系统 NSimSun，Linux runner 上直接显示方框）。
+- 检查 Inter / 思源黑体的 FontFace 状态：中文模式下两者都必须已加载，翻译模式下中文字体允许保持 `unloaded`（屏幕没有中文，浏览器按需加载本就不取它，这不是缺陷）；采集的 DOM 字符必须属于 `scripts/font-corpus.txt`；中文模式还通过 CDP `CSS.getPlatformFontsForNode` 读取「会话」标签实际命中的平台字体，确认它使用打包的思源黑体子集（Windows 实测：修复前落到系统 NSimSun，Linux runner 上直接显示方框）。
 - **每个可见标签都按同一条规则量**——`renderer/text-fit.js` 由页面加载、也由卡片自己调用：文字自己的墨迹必须留在它可能撞到的那堵墙之内（最近的裁剪祖先，或同一行里在它右边开始的下一个元素）；若元素自己裁字，就按它自己的盒子量，因为语言变长时文字明明翻译正确、却被切掉一半，而字符类检查完全看不见这一点。它会一次性报告所有场景而不是在第一个就停下——字体度量按操作系统不同：同一行在 Windows 与 Linux 都装得下，在 macOS 上却溢出 12 像素，英文措辞正是这样被发现并改短的。
 
 这些检查**不证明字体 cmap 完整覆盖、所有 fallback 字形、原生菜单、其他宿主 OS 语言版本或真实密钥加密**；语言测试本身不填写凭证，也不做加解密往返。
@@ -354,5 +354,5 @@ GitHub 官方文档：[托管 runners](https://docs.github.com/en/actions/using-
 项目代码采用 [MIT](LICENSE)。字体遵循各自许可，不由项目 MIT 许可覆盖：
 
 - **Inter**：rsms 提供，采用 SIL OFL 1.1；使用、子集化与再分发须保留许可及版权声明，这一点已做到，见 [OFL-Inter.txt](renderer/assets/font/licenses/OFL-Inter.txt)。随附子集没有声明 Reserved Font Name，`OS/2.fsType` 为 0（Installable），所以这一项不依赖任何解释。
-- **MiSans**：由小米提供，字形由汉仪制作。应用随包发布官方可变字体的子集，并在 README、应用「设置 → 关于」与 [MiSans-Notice.txt](renderer/assets/font/licenses/MiSans-Notice.txt) 中署名；协议第 2(4) 款要求字体的任何副本都带上协议原文，所以协议本身也随包分发：[MiSans-License.pdf](renderer/assets/font/licenses/MiSans-License.pdf)。
-- **MiSans 许可解决了什么、没解决什么。**第 2 条授予的是"不可转让、非独占、免版税、**可撤销**、全球性的版权许可"；2(3) 明文允许分发或出售用该字体创作的"应用（App）"等成果——本项目随应用打包正是走这一条。但同一条禁止"单独"再分发字体或其副本，而公开仓库里那个可独立下载的文件更接近被禁的一侧；2(2) 禁止"改编或二次开发"，却没给这两个词下定义、也没提子集化；而且随包子集自己的 `OS/2.fsType` 是 8（Preview & Print）。**所以本项目不声称子集已获准。**要闭合它需要小米的书面许可确认（协议第 7.2 条），或改为构建时拉取官方未改动的字体。`npm run check:release` 只强制"材料齐备"（协议与字体同包、声明措辞诚实），不替结论背书。
+- **思源黑体（Noto Sans SC）**：2.7.0 起的界面上中文字体，由 [Google Fonts 项目](https://github.com/google/fonts/tree/main/ofl/notosanssc)提供，采用 SIL Open Font License 1.1。子集化与随软件再分发正是这份许可允许的事，条件是任何副本都要带上版权声明与许可原文——已经带上：[OFL-NotoSansSC.txt](renderer/assets/font/licenses/OFL-NotoSansSC.txt)，里面还记录了源文件出处与只做过的两处改动（按 `scripts/subset-font.py` 裁剪字符，以及改名字记录：默认母版是 Thin，而界面把它当 Regular 用）。唯一的保留字体名是 `Source`，本项目没有使用；`OS/2.fsType` 为 0（Installable）。
+- **中文字体为什么换掉。**MiSans（小米提供、汉仪制作，2.6.2 及之前随包发布）的协议虽然免版税，却明确**可撤销**，并且留下两个没有答案的问题：2(2) 禁止"改编或二次开发"，却没给这两个词下定义、也没提子集化；2(3) 禁止"单独"再分发字体或其副本，而公开仓库里那个可独立下载的 `.woff2` 更接近被禁的一侧；而且那个子集自己的 `OS/2.fsType` 是 8（Preview & Print）。换成 OFL 字体不需要向任何人申请许可，就把这两条问住了的地方讲清楚了。有一件事换字体做不到：**本仓库的历史里仍然有 MiSans 子集和它的协议**，只往前改动的提交删不掉它。`npm run check:release` 为随包的每一款字体守着材料：每个字体文件都要配上一份含 OFL 原文与版权声明的许可文件，每个 `.woff2` 都得真的是 woff2 容器。

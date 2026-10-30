@@ -102,7 +102,7 @@ try {
       panelBg: cs.background.slice(0, 60),
       radius: cs.borderTopLeftRadius,
       gauge: document.getElementById('stripGauge').className,
-      fonts: { inter: document.fonts.check('600 16px Inter'), misans: document.fonts.check('400 12px MiSans') },
+      fonts: { inter: document.fonts.check('600 16px Inter'), cjk: document.fonts.check('400 12px "Noto Sans SC"') },
       dataFont: getComputedStyle(document.getElementById('stripRunway')).fontFamily,
       size: getComputedStyle(document.getElementById('stripRunway')).fontSize
     }

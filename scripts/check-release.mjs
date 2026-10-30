@@ -34,12 +34,12 @@ if (refType === 'tag') {
   assert.equal(refName, `v${pkg.version}`, 'release tag must be v + package.json version')
 }
 
-// Every bundled font must ship the paperwork its own licence asks for. This is
-// not decoration: the MiSans agreement, clause 2(4), requires the copyright
-// notice and the agreement itself to be retained in any copy of the font, and
-// the subset is a copy that travels with the app and with this repository. A
-// font file added without its licence would otherwise pass every functional
-// check in the suite — nothing at runtime notices a missing PDF.
+// Every bundled font must ship the paperwork its own licence asks for, and must
+// be the container its extension claims. The second half is not pedantry: a
+// subsetting script that forgets to set the writer's flavour produced a 210KB
+// uncompressed TrueType file named .woff2, which every functional check in the
+// suite would have shipped — Chromium simply refuses to parse it, so the app
+// would have fallen back to whatever Chinese face the machine happened to have.
 const fontDir = path.join(root, 'renderer', 'assets', 'font')
 const licenceDir = path.join(fontDir, 'licenses')
 const fonts = fs.existsSync(fontDir)
@@ -47,21 +47,28 @@ const fonts = fs.existsSync(fontDir)
   : []
 const licences = fs.existsSync(licenceDir) ? fs.readdirSync(licenceDir) : []
 assert.ok(fonts.length, 'no bundled fonts found — has the font directory moved?')
-assert.ok(licences.length, 'renderer/assets/font/licenses is missing or empty')
+assert.ok(licences.length, 'renderer/assets/font/licenses is empty')
+const MAGIC = { '.woff2': 'wOF2', '.woff': 'wOFF' }
 for (const font of fonts) {
+  const bytes = fs.readFileSync(path.join(fontDir, font))
+  const magic = MAGIC[path.extname(font).toLowerCase()]
+  if (magic) {
+    assert.equal(bytes.subarray(0, 4).toString('latin1'), magic,
+      `${font} claims to be ${magic} but starts with ${JSON.stringify(bytes.subarray(0, 4).toString('latin1'))} — ` +
+      'it is not a woff2 container; re-run scripts/subset-font.py')
+  }
+  assert.ok(bytes.length > 1000, `${font} is too small to be a real subset (${bytes.length} bytes)`)
   const family = font.split(/[-_.]/)[0].toLowerCase()
-  // Matched anywhere in the name, not as a prefix: Inter's licence travels as
-  // OFL-Inter.txt, which is the conventional way to name an OFL file.
+  // Matched anywhere in the name, not as a prefix: an OFL file travels as
+  // OFL-Inter.txt, which is the conventional way to name it.
   const paired = licences.filter((file) => file.toLowerCase().includes(family))
   assert.ok(paired.length, `${font} is bundled with no licence file for its family in licenses/`)
-  if (family === 'misans') {
-    // The summary is ours; the agreement is Xiaomi's text, and a link can move.
-    assert.ok(paired.some((file) => /\.pdf$/i.test(file)),
-      'MiSans requires the agreement itself beside it (clause 2(4)) — no PDF in licenses/')
-    const notice = read('renderer', 'assets', 'font', 'licenses', 'MiSans-Notice.txt')
-    assert.match(notice, /revocable/, 'the MiSans notice must state that the grant is revocable')
-    assert.doesNotMatch(notice, /符合 ?MiSans ?协议|complies with the MiSans licence/,
-      'the MiSans notice must not claim compliance the agreement does not settle')
+  for (const licence of paired) {
+    const text = read('renderer', 'assets', 'font', 'licenses', licence)
+    // Both bundled faces are SIL OFL 1.1, whose condition on any copy is that
+    // the copyright notice and the licence itself travel with it.
+    assert.match(text, /SIL OPEN FONT LICENSE/, `${licence} does not carry the OFL text it claims`)
+    assert.match(text, /Copyright (?:\(c\)|©)/, `${licence} is missing the copyright notice OFL requires keeping`)
   }
 }
 

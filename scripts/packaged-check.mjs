@@ -236,7 +236,7 @@ try {
     gaugeRatio: getComputedStyle(document.getElementById('stripGauge')).getPropertyValue('--ratio').trim(),
     fonts: {
       inter: document.fonts.check('600 16px Inter'),
-      misans: document.fonts.check('400 12px MiSans')
+      cjk: document.fonts.check('400 12px "Noto Sans SC"')
     },
     scene: getComputedStyle(document.getElementById('stage')).backgroundImage
   })`)
@@ -248,7 +248,7 @@ try {
   assert.equal(strip.gaugeRatio, '0.66')
   assert.ok(strip.sparkPaths >= 2)
   assert.equal(strip.scene, 'none', 'stage wallpaper must stay hidden outside showcase')
-  assert.ok(strip.fonts.inter && strip.fonts.misans, 'bundled fonts must load')
+  assert.ok(strip.fonts.inter && strip.fonts.cjk, 'bundled fonts must load')
 
   phase = 'deck-transition-and-assertions'
   await evaluate("document.querySelector('.strip-main').click()")

@@ -18,6 +18,14 @@
 
   const LOCALES = ['zh', 'en', 'es', 'pt-BR', 'de']
   const HTML_LANG = { zh: 'zh-CN', en: 'en', es: 'es', 'pt-BR': 'pt-BR', de: 'de' }
+  // Strings that are never translated, whatever language is on screen. A
+  // language picker names each language in that language's own script — 中文 is
+  // what the Chinese chip has to read in English and German mode as well,
+  // because "Chinese"/"Chinesisch" would name it in a script the reader may not
+  // have chosen. The list lives here so the product, `scripts/check-i18n.mjs`
+  // and the on-screen scan in `scripts/i18n-check.mjs` cannot disagree about
+  // what counts as Chinese left on purpose.
+  const NATIVE_SCRIPT_NAMES = ['中文']
   // CJK punctuation, Extension A, Unified Ideographs, compatibility forms and
   // the half/full-width block. Built from escapes so re-encoding this file
   // cannot quietly widen the class.
@@ -91,6 +99,7 @@
     if (!dictionary) return text
     const trimmed = text.trim()
     if (!trimmed) return text
+    if (NATIVE_SCRIPT_NAMES.includes(trimmed)) return text
     // A few labels are authored as ASCII instrument chrome — DAYS, TOTAL,
     // SYNCED, PEAK — because Chinese mode shows them that way too. They are
     // still UI copy, so a dictionary may answer them; every rule is anchored,
@@ -169,6 +178,7 @@
   const api = {
     LOCALES,
     HTML_LANG,
+    NATIVE_SCRIPT_NAMES,
     CJK,
     MONTH_NAMES,
     register,
