@@ -56,15 +56,23 @@ jobs:
       ELECTRON_CACHE: ${{ github.workspace }}/.download-cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.download-cache/electron-builder
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to the majors that actually run on Node 24. The v4 of each of
+      # these still declares node20, and GitHub now forces them onto Node 24
+      # while printing a deprecation warning on every job — a warning that hides
+      # the ones worth reading. They ask for runner v2.327.1 or newer, which the
+      # hosted images for all four platforms are past; setup-node's automatic
+      # caching is irrelevant here because `cache: npm` is stated anyway, and
+      # checkout's new fork-PR block does not apply since no job uses
+      # pull_request_target or workflow_run.
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - name: Cache Electron and electron-builder downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # Every round a cold runner re-downloaded the ~100MB Electron binary and
           # electron-builder's tooling before running anything — and two Apple
@@ -143,7 +151,7 @@ jobs:
         run: |
           dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1200x24' bash -e -c 'openbox >/tmp/token-monitor-openbox.log 2>&1 & npm run test:distributable'
       - name: Upload runnable packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -161,7 +169,7 @@ jobs:
           compression-level: 0
       - name: Upload test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: diagnostics-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -182,7 +190,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v7
         with:
           pattern: packages-*
           path: downloads
