@@ -235,6 +235,13 @@ jobs:
           # SHA256SUMS.txt itself agreeing with them, because that list is the only
           # thing a reader has to trust a download with. No apostrophes inside: the
           # script is passed in one single-quoted shell string.
+          #
+          # Its first exercise was the v2.7.0 tag, and it failed there — on itself.
+          # `gh release view --json` takes GraphQL field names, so `prerelease` is
+          # not a field; the correct one is `isPrerelease`, and gh answers an
+          # unknown field by listing the valid ones and exiting 1. The release it
+          # was checking was already published and correct. Lesson kept where it
+          # belongs: a step that has never run is not a step that works.
           node -e '
           const crypto = require("node:crypto")
           const fs = require("node:fs")
@@ -243,9 +250,9 @@ jobs:
           const packages = ["win-x64.zip", "linux-x64.AppImage", "mac-arm64.dmg", "mac-arm64.zip", "mac-x64.dmg", "mac-x64.zip"]
             .map((suffix) => `token-monitor-${version}-${suffix}`)
           const want = [...packages, "SHA256SUMS.txt"].sort()
-          const released = JSON.parse(execFileSync("gh", ["release", "view", process.env.GITHUB_REF_NAME, "--json", "assets,isDraft,prerelease"], { encoding: "utf8" }))
+          const released = JSON.parse(execFileSync("gh", ["release", "view", process.env.GITHUB_REF_NAME, "--json", "assets,isDraft,isPrerelease"], { encoding: "utf8" }))
           const names = released.assets.map((asset) => asset.name).sort()
-          if (released.isDraft || released.prerelease) throw Error("published release is still a draft or a prerelease")
+          if (released.isDraft || released.isPrerelease) throw Error("published release is still a draft or a prerelease")
           const missing = want.filter((name) => !names.includes(name))
           const extra = names.filter((name) => !want.includes(name))
           if (missing.length || extra.length) throw Error(`asset set wrong: missing ${missing} extra ${extra}`)
