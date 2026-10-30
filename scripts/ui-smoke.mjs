@@ -501,6 +501,9 @@ try {
       // the content trail the edge by 60-100ms, so the architecture is graded.
       panelChanges,
       panelMoves,
+      // t:panel(pin)/window for every frame — the only way to tell a missing
+      // pin from a layout clamp from the artifact alone.
+      panelSeries: run.samples.map((s) => `${s.t}:${s.panel}${s.pin ? '[' + s.pin + ']' : ''}/${s.win}${s.morphing ? '' : '.'}`),
       dimmest: Math.min(...frameWindow.map((s) => Math.max(s.so, s.dop))),
       deckHeights: [Math.min(...frameWindow.map((s) => s.deck)), Math.max(...frameWindow.map((s) => s.deck))],
       stripHeights: [Math.min(...frameWindow.map((s) => s.strip)), Math.max(...frameWindow.map((s) => s.strip))]
@@ -543,7 +546,7 @@ try {
   // architecture exists to prevent, so it is graded, not just described.
   assert.ok(
     graded.panelChanges <= 1,
-    `the card was re-laid-out ${graded.panelChanges} times during one morph; it must be pinned and revealed — ${JSON.stringify(graded.panelMoves)}`
+    `the card was re-laid-out ${graded.panelChanges} times during one morph; it must be pinned and revealed — ${JSON.stringify(graded.panelMoves)} series ${JSON.stringify(graded.panelSeries)}`
   )
   assert.ok(
     graded.dimmest > 0.45,
