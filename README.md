@@ -60,7 +60,7 @@ The two images below come from a live window rather than the staged showcase, as
 ## Download and run
 
 Releases: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Development builds are in the Artifacts of each Actions run.
-**[v2.6.2](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.2) is the current release** — the build that finished teaching the card to fit its own numbers: five languages, both window forms, and every digit measured against what the reader can actually lose, re-checked after the platform finishes handing over its font metrics. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and GitHub's own asset digest, and was extracted and launched on a real Windows 10 machine reporting version 2.6.2 with `isPackaged`; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop. It supersedes v2.6.1 (published earlier the same day), which measured numbers against element boxes rather than the text inside them — so on the platforms whose boxes were tighter, it shrank figures that actually had room.
+**[v2.7.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.0) is the current release** — the one that changed the interface's Chinese face, and with it the last thing this project had to take on trust: MiSans is gone from what ships, and the bundle now carries a subset of Noto Sans SC under SIL OFL 1.1, so the licence no longer rests on an interpretation of a grant that was explicitly revocable. The language picker says `中文` in every language, the ledger's balance breakdown compacts from ¥10,000 rather than ¥1,000,000, and the workflow's actions moved onto the majors that run on Node 24. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and GitHub's own asset digest, and was extracted and launched on a real Windows 10 machine reporting version 2.7.0 with `isPackaged`; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop. It supersedes v2.6.2, whose published build still draws the breakdown line at a million — a released version is never rewritten.
 
 | Platform | Package | How to run it |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 16 language scenarios × 4 interface states pass, every collected character is inside the corpus, no label is clipped in any shipped language, and 10 number-fit runs × 10 magnitudes leave no number outside its box.
 
-**Thirty-eight cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat. One of those negatives is about the tests themselves: the morph check was blind on macOS, where the window edge moves after the CSS class it sampled had already gone (round 12), so it now grades the observed motion instead.
+**Forty-four cloud rounds so far; the current release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat. One of those negatives is about the tests themselves: the morph check was blind on macOS, where the window edge moves after the CSS class it sampled had already gone (round 12), so it now grades the observed motion instead.
 
 <details>
 <summary>Cloud build history (rounds 1–13)</summary>
@@ -254,9 +254,23 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 **Round 38 (`2d2bd9d`, all four green)**: the cache directories moved inside the workspace, where a job may name them and where `build.files` — an explicit list — cannot sweep them into a shipped package. The caches API now lists one entry per platform and architecture: 133MB on Linux, 158MB on Windows, 197MB and 202MB on the two macOS runners. That is the Electron and electron-builder payload the next round restores instead of re-fetching; the keys carry the lockfile hash, so a dependency change starts a new set, and the oldest caches age out when the quota fills.
 
+**Round 39 (`2eb0de3`, all four green)**: documentation only — the MiSans notice finally said *revocable*, and the agreement itself started travelling beside the subset.
+
+**Round 40 (`15b66c6`, three green, macOS ARM red)**: the Chinese face became a Noto Sans SC subset, measured before it was made and pixel-neutral across 119 text elements. Apple Silicon failed on `the ¥123,456.78 figure was never shrunk` — in the same record that showed `inline: 11.2px`, the attribute the card itself writes. The previous green report from that runner answered it, because there the pair was inverted: `inline: ""` with the used size still `11.2px`. The inline value and the used value are two views of one element and a snapshot can land between them; the check had been calling one condition by two names since the day it was written.
+
+**Round 41 (`b01f4dc`, three green, macOS ARM red)**: the renamed finding went quiet, and the same disagreement walked in through the other door — `es/deck · eight figures` reported the headline balance escaping by 6px with the CSSOM already holding the fitted size. So a reported escape is now re-read after one further watch tick and the later reading decides, with both kept in the report. Proven not to be a retry-until-green: with a deliberately wide face, all five `stripToday 28px` giveouts survive the re-read and still fail, because at the floor that number genuinely does not fit.
+
+**Round 42 (`f33f13b`, all four green)**: the font swap, the two check corrections and the actions' move onto Node 24 (checkout v7, setup-node v7, cache v6, upload-artifact v7, download-artifact v7) landed together, and the ARM report showed the new contract working — `deckBalance` escaping 74px on the first reading and gone one tick later, which is the card repairing its own page while the check was looking at the frame before it. Caching was re-verified after the version bump rather than assumed: both the Electron and the npm caches hit on their primary keys, and no job printed a warning line at all.
+
+**Round 43 (`v2.7.0` tag, run 41016395780)**: four builds green, seven assets published — and the release job's own asset cross-check failed, on itself. `gh release view --json` takes GraphQL field names, so `prerelease` is not a field, and gh answers an unknown one by listing the valid ones and exiting 1. The release it was checking was already correct: not a draft, and all six package digests equal to the hashes in `SHA256SUMS.txt`.
+
+**Round 44 (`f422704`, all four green)**: the corrected query, checked against the live release instead of trusted from reading it — `--json assets,isDraft,isPrerelease` returns `isDraft=false`, `isPrerelease=false` and seven assets with digests.
+
 </details>
 
-**What v2.6.2 still ships with**: on `main`, the ledger's balance breakdown switches to compact units from ten thousand up; the published v2.6.2 draws that line at a million. So with one of those two fields between ¥10,000 and ¥999,999.99, a machine whose metrics are tight — macOS Intel, in CI's own measurements — renders the German version of the line with its last eight pixels past the edge. The headline balance and every other figure are unaffected, and no demo or ordinary-sized account reaches the case. The fix is on `main` (round 34, green on all four runners) and rides with the next release rather than taking its own tag.
+**Closed by v2.7.0**: the ledger's balance breakdown switches to compact units from ten thousand up rather than from a million, so a German line with one of those two fields between ¥10,000 and ¥999,999.99 no longer loses its last eight pixels on a machine whose metrics are tight. The published v2.6.2 still draws it at a million, and will: a released version is never rewritten.
+
+**A negative about the release path itself**: the step that re-checks the published asset set, the digests and `SHA256SUMS.txt` was written in round 36 and first *executed* in round 43 — on the v2.7.0 tag — where it failed immediately on its own bug (`gh release view --json` wants `isPrerelease`, not `prerelease`). The release it was checking was already published and correct. That is the same lesson this project has now paid for three separate ways — a green cache step that stored nothing, a morph check blind on one platform, a verification step that had never run: **a step that has never run is not a step that works.**
 
 **What the macOS keychain really means in CI**: running from source probes `keychain` (the unsigned Electron entry is pre-authorized on the runner), while the **packaged app stays at `pending`** — the system never answers. The checks now accept and report that instead of hanging, but it means **real Keychain encryption in the packaged macOS app has never been verified anywhere**, and this README does not claim it has.
 
@@ -294,7 +308,7 @@ These checks do **not** prove complete cmap coverage, every fallback glyph, nati
 
 ## GitHub Actions and releases
 
-The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published five times — v2.4.1, v2.5.0, v2.6.0, v2.6.1 and v2.6.2. A weekly scheduled run against `main` catches runner-image drift while no release is waiting on the answer; the Electron and electron-builder downloads are cached per platform and lockfile, because a cold runner was re-fetching ~100MB before it ran anything; and after publishing, the release job re-checks the asset set, the published digests and `SHA256SUMS.txt` against the files the runners built.
+The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published six times — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2 and v2.7.0. A weekly scheduled run against `main` catches runner-image drift while no release is waiting on the answer; the Electron and electron-builder downloads are cached per platform and lockfile, because a cold runner was re-fetching ~100MB before it ran anything; and after publishing, the release job re-checks the asset set, the published digests and `SHA256SUMS.txt` against the files the runners built — a step that first ran on v2.7.0, failed there on its own field name, and has since been checked against the live release.
 A local `git commit` triggers nothing in the cloud; a push, a pull request or a manual run does. GitHub Packages is for npm / container registries and the like — this project distributes desktop binaries through Artifacts and Release assets.
 
 | Trigger | Behaviour |
@@ -329,7 +343,7 @@ A tag containing `-` (for example `v2.7.0-beta.1`) is published as a pre-release
 
 ```bash
 git push origin main          # first: let all four runners go green on the new commit
-git push origin v2.6.2        # then: push the tag alone, which is what triggers a Release
+git push origin v2.7.0        # then: push the tag alone, which is what triggers a Release
 ```
 
 GitHub documentation: [hosted runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

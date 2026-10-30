@@ -60,7 +60,7 @@ As duas imagens abaixo vêm de uma janela real em execução, não da vitrine en
 ## Baixar e executar
 
 Lançamentos: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Compilações de desenvolvimento estão nos Artifacts de cada execução do Actions.
-**[v2.6.2](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.6.2) é a versão atual** — a compilação que terminou de ensinar o cartão a ajustar os próprios números: cinco idiomas, as duas formas de janela, e cada dígito medido pelo que o leitor de fato perde, reconfirmado quando a plataforma entrega as métricas da fonte. Os quatro runners nativos passaram, e a página traz seis pacotes mais `SHA256SUMS.txt`. O pacote do Windows foi baixado de novo daquela página, bateu com a soma de verificação e com o resumo do próprio recurso do GitHub, e foi extraído e iniciado em um Windows 10 de verdade reportando versão 2.6.2 com `isPackaged`; os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners, não pela máquina do desenvolvedor. Ele substitui o v2.6.1 (publicado mais cedo no mesmo dia), que media os números pelas caixas dos elementos e não pelo texto dentro delas — então, nas plataformas de caixa mais apertada, encolhia números que tinham espaço.
+**[v2.7.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.0) é a versão atual** — a que trocou a fonte chinesa da interface e, com ela, a última coisa que este projeto precisava aceitar por confiança: o MiSans não viaja mais no pacote, que agora traz um subconjunto do Noto Sans SC sob SIL OFL 1.1, então a licença não depende mais de interpretar uma concessão explicitamente **revogável**. O seletor de idioma diz `中文` em todos os idiomas, a linha de composição do saldo passa à notação compacta a partir de ¥10.000 em vez de ¥1.000.000, e as ações do fluxo passaram aos maiores que rodam em Node 24. Os quatro runners nativos passaram, e a página traz seis pacotes mais `SHA256SUMS.txt`. O pacote do Windows foi baixado de novo daquela página, bateu com a soma de verificação e com o resumo do próprio recurso do GitHub, e foi extraído e iniciado em um Windows 10 de verdade reportando versão 2.7.0 com `isPackaged`; os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners, não pela máquina do desenvolvedor. Ele substitui o v2.6.2, cujo pacote publicado ainda traça a linha da composição no milhão — e uma versão publicada nunca é reescrita.
 
 | Plataforma | Pacote | Como executar |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ A interface é escrita em chinês, e cada outro idioma é um dicionário cujas c
 
 nenhum rótulo fica cortado em nenhum idioma incluído; nas 10 passadas de caimento de número × 10 escalas de magnitude também nenhum número sai da caixa.
 
-**Trinta e oito rodadas na nuvem até aqui; a versão publicada está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva. Um daqueles negativos é sobre os próprios testes: a checagem da deformação estava cega no macOS, onde a borda da janela se move depois que a classe CSS que ela amostrava já tinha sumido (rodada 12), então agora ela avalia o movimento observado.
+**Quarenta e quatro rodadas na nuvem até aqui; a versão publicada está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva. Um daqueles negativos é sobre os próprios testes: a checagem da deformação estava cega no macOS, onde a borda da janela se move depois que a classe CSS que ela amostrava já tinha sumido (rodada 12), então agora ela avalia o movimento observado.
 
 <details>
 <summary>Histórico de compilações na nuvem (rodadas 1–13)</summary>
@@ -254,9 +254,23 @@ nenhum rótulo fica cortado em nenhum idioma incluído; nas 10 passadas de caime
 
 **Rodada 38 (`2d2bd9d`, os quatro verdes)**: os diretórios de cache mudaram para dentro do workspace, onde um job pode nomeá-los e onde o `build.files` — uma lista explícita — não pode arrastá-los para um pacote. A API de caches lista uma entrada por plataforma e arquitetura: 133MB no Linux, 158MB no Windows, 197MB e 202MB nos dois macOS. É esse o volume de Electron e electron-builder que a próxima rodada restaura em vez de baixar de novo; as chaves levam o hash do lockfile, então mudar uma dependência abre um conjunto novo, e a cache mais antiga sai quando a cota enche.
 
+**Rodada 39 (`2eb0de3`, os quatro verdes)**: só documentação — o aviso do MiSans finalmente disse «revogável», e o contrato começou a viajar ao lado do subconjunto.
+
+**Rodada 40 (`15b66c6`, três verdes e macOS ARM vermelho)**: a face chinesa virou um subconjunto do Noto Sans SC, medido antes de trocar e neutro em pixels nos 119 elementos de texto. O Apple Silicon falhou com «o número ¥123.456,78 nunca foi encolhido» — no mesmo registro que mostrava `inline: 11.2px`, o atributo que o próprio cartão escreve. O relatório verde anterior daquele runner respondeu, porque lá o par estava invertido: `inline: ""` com o tamanho usado ainda em `11.2px`. O valor em linha e o valor usado são duas vistas de um mesmo elemento, e uma amostra pode cair entre as duas; a checagem vinha, desde que foi escrita, chamando uma só condição por dois nomes.
+
+**Rodada 41 (`b01f4dc`, três verdes e macOS ARM vermelho)**: o achado renomeado se calou, e o mesmo desacuerdo entrou pela outra porta — `es/deck · eight figures` reportou o total do saldo escapando 6px com o CSSOM já carregando o tamanho ajustado. Então um escape reportado é relido depois de mais um tick do vigia, e é a leitura tardia que decide, com as duas guardadas no relatório. Não é repetir até ficar verde: com uma face deliberadamente larga, os cinco `stripToday 28px` sobrevivem à releitura e continuam falhando, porque no piso aquele número realmente não cabe.
+
+**Rodada 42 (`f33f13b`, os quatro verdes)**: a troca de fonte, as duas correções da checagem e a mudança das ações para Node 24 (checkout v7, setup-node v7, cache v6, upload-artifact v7, download-artifact v7) chegaram juntos, e o relatório do ARM mostrou o contrato novo funcionando: `deckBalance` escapando 74px na primeira leitura e ausente um tick depois — o cartão já tinha consertado a página e a checagem estava olhando o quadro anterior. O cache foi reverificado depois do aumento de versão em vez de presumido: Electron e npm acertaram na chave primária, e nenhum job imprimiu uma linha de aviso.
+
+**Rodada 43 (tag `v2.7.0`, execução 41016395780)**: quatro construções verdes, sete recursos publicados — e a própria reconfirmação do job de lançamento falhou, nela mesma. `gh release view --json` aceita nomes de campo do GraphQL, então `prerelease` não é campo, e o gh responde a um campo desconhecido listando os válidos e saindo com 1. O lançamento que ela checava já estava correto: nem rascunho, nem pré-lançamento, e os seis resumos de pacote iguais aos hashes do `SHA256SUMS.txt`.
+
+**Rodada 44 (`f422704`, os quatro verdes)**: a consulta corrigida foi conferida no lançamento de verdade, não confiada por leitura — `--json assets,isDraft,isPrerelease` devolve `isDraft=false`, `isPrerelease=false` e sete recursos com resumo.
+
 </details>
 
-**O que o v2.6.2 ainda traz**: no `main` a linha de composição do saldo passa à notação compacta a partir de dez mil; a v2.6.2 publicada traça esse limite num milhão. Então, se um daqueles dois campos cair entre ¥10.000 e ¥999.999,99, uma máquina com métricas justas — o macOS Intel, nas próprias medições do CI — renderiza a versão alemã da linha com seus últimos oito pixels fora da borda. O total e todos os outros números não são afetados, e nenhuma conta de demonstração ou de tamanho normal chega nesse caso. A correção está no `main` (rodada 34, verde nos quatro runners) e sai junto do próximo lançamento em vez de levar uma tag própria.
+**Fechado pelo v2.7.0**: a linha de composição do saldo passa à notação compacta a partir de dez mil e não de um milhão, de modo que uma máquina com métricas justas já não deixa os últimos oito pixels da linha alemã fora da borda quando um daqueles dois campos cai entre ¥10.000 e ¥999.999,99. A v2.6.2 publicada mantém o limite velho, e vai manter: uma versão publicada nunca é reescrita.
+
+**Um negativo sobre o próprio caminho de lançamento**: o passo que reconfere o conjunto de recursos, os resumos e o `SHA256SUMS.txt` foi escrito na rodada 36 e *executado* pela primeira vez na rodada 43 — a tag v2.7.0 —, onde falhou na hora por culpa própria (`gh release view --json` quer `isPrerelease`, não `prerelease`). O lançamento que ele checava já estava correto. Essa é a terceira forma de o projeto pagar a mesma lição — um passo de cache verde que não guardava nada, uma checagem de deformação cega numa plataforma, um passo de verificação que nunca tinha rodado: **um passo que nunca rodou não é um passo que funciona.**
 
 **O que o chaveiro do macOS realmente significa no CI**: rodar pelo código sonda `keychain` (a entrada do Electron não assinado vem pré-autorizada no runner), enquanto **o app empacotado fica em `pending`** — o sistema nunca responde. As checagens agora aceitam e relatam isso em vez de travar, mas isso significa que **a criptografia real do Chaveiro no app empacotado do macOS nunca foi verificada em lugar nenhum**, e este README não afirma que foi.
 
@@ -294,7 +308,7 @@ Essas checagens **não** provam cobertura cmap completa, cada glifo de reserva, 
 
 ## GitHub Actions e lançamentos
 
-O fluxo é [`.github/workflows/build.yml`](.github/workflows/build.yml); os quatro runners completaram execuções de verdade, e o caminho de lançamento publicou cinco vezes — v2.4.1, v2.5.0, v2.6.0, v2.6.1 e v2.6.2. Uma execução semanal contra a main pega a deriva das imagens do runner quando nenhuma publicação está na fila; o download do Electron e do electron-builder fica em cache por plataforma e lockfile; e depois de publicar, o job de lançamento confere de novo o conjunto de recursos, seus resumos e o `SHA256SUMS.txt` contra os arquivos que os runners construíram.
+O fluxo é [`.github/workflows/build.yml`](.github/workflows/build.yml); os quatro runners completaram execuções de verdade, e o caminho de lançamento publicou seis vezes — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2 e v2.7.0. Uma execução semanal contra a main pega a deriva das imagens do runner quando nenhuma publicação está na fila; o download do Electron e do electron-builder fica em cache por plataforma e lockfile; e depois de publicar, o job de lançamento confere de novo o conjunto de recursos, seus resumos e o `SHA256SUMS.txt` contra os arquivos que os runners construíram — uma checagem que rodou pela primeira vez no v2.7.0, ali falhou pelo próprio nome de campo e desde então foi conferida no lançamento real.
 Um `git commit` local não dispara nada na nuvem; um push, um pull request ou uma execução manual disparam. GitHub Packages é para npm / registros de contêiner e afins — este projeto distribui binários de desktop por Artifacts e assets de Release.
 
 | Gatilho | Comportamento |
@@ -329,7 +343,7 @@ Uma tag com `-` (por exemplo `v2.7.0-beta.1`) é publicada como pré-lançamento
 
 ```bash
 git push origin main          # primeiro: deixe os quatro runners ficarem verdes no commit novo
-git push origin v2.6.2        # depois: envie a tag sozinha, que é o que dispara uma Release
+git push origin v2.7.0        # depois: envie a tag sozinha, que é o que dispara uma Release
 ```
 
 Documentação do GitHub: [runners hospedados](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [eventos que disparam fluxos de trabalho](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
