@@ -1279,7 +1279,10 @@ const MORPH_CLASSES = ['morphing', 'morph-run', 'morph-to-deck', 'morph-to-strip
 function clearMorphClasses() {
   document.body.classList.remove(...MORPH_CLASSES)
   const panel = document.getElementById('panel')
-  if (panel) panel.style.height = ''
+  if (panel) {
+    panel.style.height = ''
+    panel.style.minHeight = ''
+  }
 }
 
 async function switchView(next, { persist = true } = {}) {
@@ -1302,12 +1305,18 @@ async function switchView(next, { persist = true } = {}) {
   // and the content ran 60-100ms behind the frame edge (one resize of this
   // window takes that long to reach the page). Pinning the height means the
   // moving edge clips a card that is already final, so there is nothing to lag.
-  // Set as an inline height on the panel, not as a custom property: on CI the
-  // var() resolved to its fallback for two frames while the window was already
-  // shrinking, which read as the card re-laying-out. An inline height has no
-  // inheritance step to lose. Cleared in clearMorphClasses.
-  document.getElementById('panel').style.height =
-    `${Math.max(Math.round(panelBox.height), targetPanel)}px`
+  //
+  // Both height and min-height, because CI caught one frame where a definite
+  // inline height was still laid out as 100% of the shrinking stage (640 -> 613
+  // -> 640 while the window did not change in between). Two things that were
+  // ruled out on the way there: a custom property read via var() (it resolved to
+  // its fallback) and the inline height arriving late (the value was on the
+  // element on every frame, that one included). A minimum cannot be resolved
+  // downwards that way, so the strict "laid out once" assertion stands.
+  // Cleared in clearMorphClasses.
+  const pin = `${Math.max(Math.round(panelBox.height), targetPanel)}px`
+  document.getElementById('panel').style.height = pin
+  document.getElementById('panel').style.minHeight = pin
   // Stack both views, then let the incoming one land while the window moves.
   // No frame of this ever shows an empty card.
   document.body.classList.add('morphing', `morph-from-${source}`, `morph-to-${target}`)
