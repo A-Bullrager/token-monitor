@@ -486,6 +486,28 @@ async function runOne(locale, view) {
           `so its numbers were never graded — ${JSON.stringify(clipped).slice(0, 400)}`)
       }
       entry.fixtures[fixture.name] = { clipped, overrides, today, passes, graded, watchRuns }
+      // An escape the card repairs on its next pass is a lag; one that survives a
+      // pass is what the reader keeps looking at. macOS ARM reported a deck figure
+      // whose inline fit said 16.5px while the page still laid it out at 33px,
+      // three watch passes after the change — so on a platform nobody has in the
+      // room, one instantaneous reading is not a verdict. The re-check is bounded
+      // to a single further pass, and both readings stay in the report either way.
+      if (graded && clipped.length && watchRuns) {
+        const ticksBefore = await evaluate(TICKS)
+        for (let deadline = Date.now() + 4000; Date.now() < deadline;) {
+          await sleep(150)
+          if (await evaluate(TICKS) > ticksBefore) break
+        }
+        const second = await evaluate(MEASURE)
+        const brief = (list) => list.map((item) => `${item.where} ${item.pixels}px`)
+        entry.fixtures[fixture.name].escapeLag = {
+          first: brief(clipped), second: brief(second.clipped), ticksBefore, ticksAfter: await evaluate(TICKS)
+        }
+        clipped = second.clipped
+        overrides = second.overrides
+        today = second.today
+        Object.assign(entry.fixtures[fixture.name], { clipped, overrides, today })
+      }
       // Prove the fitter actually ran, not just that the page looks fine: a
       // silent no-op on another platform would otherwise pass by luck until a
       // wider font made the same number overflow again. The witness came from
