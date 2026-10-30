@@ -41,16 +41,20 @@ jobs:
       EXPECTED_PLATFORM: ${{ matrix.platform }}
       EXPECTED_ARCH: ${{ matrix.arch }}
       # Where the downloaders put their files, told to them rather than guessed
-      # from each platform's profile directory. The first version of the cache step
-      # below cached `${{ runner.home }}/.cache/electron` and friends and saved
-      # nothing — verified afterwards through the API: zero caches with the
-      # `electron-` prefix. `electron_config_cache` is the name electron's own
-      # installer reads; `ELECTRON_CACHE` is the spelling the fetcher documents;
-      # electron-builder has its own variable. All three point at the same two
-      # directories, so one cache covers every way a dependency can be fetched.
-      electron_config_cache: ${{ runner.temp }}/electron-cache
-      ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
-      ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+      # from each platform's profile directory: the first attempt cached
+      # runner.home-based paths and saved nothing at all (checked through the
+      # caches API afterwards: zero `electron-` caches). `electron_config_cache` is
+      # the name electron's own installer reads — ELECTRON_CACHE is not; the
+      # fetcher documents that spelling, so both are set to the same directory —
+      # and electron-builder has its own variable. Inside the workspace rather than
+      # under the runner temp dir, because the `runner` context is not available in
+      # a job-level `env` (a run that fails with "This run likely failed because of a
+      # workflow file issue" is how that was learned), and because `build.files` in
+      # package.json is an explicit list, so this directory cannot leak into a
+      # shipped package.
+      electron_config_cache: ${{ github.workspace }}/.download-cache/electron
+      ELECTRON_CACHE: ${{ github.workspace }}/.download-cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.download-cache/electron-builder
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,14 +70,15 @@ jobs:
           # electron-builder's tooling before running anything — and two Apple
           # Silicon rounds failed in the minute they spent doing it, with
           # "Downloading Electron binary..." as the last honest line in the log.
-          # The paths are the ones the env block above *forces* them to, not the
-          # runner's defaults; the key is the lockfile hash and the architecture, so
-          # a dependency change cannot restore a stale binary and nothing crosses
-          # platforms. Whether this actually saves is checked afterwards from the
-          # caches API, not assumed from a green run.
+          # These are exactly the directories the env block above points the tools
+          # at; the key is the lockfile hash and the architecture, so a dependency
+          # change cannot restore a stale binary and nothing crosses platforms.
+          # Whether this saves anything is answered by the caches API after a green
+          # round, not by the step being green — a cache that stores nothing still
+          # reports success.
           path: |
-            ${{ runner.temp }}/electron-cache
-            ${{ runner.temp }}/electron-builder-cache
+            ${{ github.workspace }}/.download-cache/electron
+            ${{ github.workspace }}/.download-cache/electron-builder
           key: electron-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: electron-${{ runner.os }}-${{ matrix.arch }}-
       - name: Check host, version and docs
