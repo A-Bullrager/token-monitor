@@ -40,6 +40,17 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       EXPECTED_PLATFORM: ${{ matrix.platform }}
       EXPECTED_ARCH: ${{ matrix.arch }}
+      # Where the downloaders put their files, told to them rather than guessed
+      # from each platform's profile directory. The first version of the cache step
+      # below cached `${{ runner.home }}/.cache/electron` and friends and saved
+      # nothing — verified afterwards through the API: zero caches with the
+      # `electron-` prefix. `electron_config_cache` is the name electron's own
+      # installer reads; `ELECTRON_CACHE` is the spelling the fetcher documents;
+      # electron-builder has its own variable. All three point at the same two
+      # directories, so one cache covers every way a dependency can be fetched.
+      electron_config_cache: ${{ runner.temp }}/electron-cache
+      ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
+      ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,20 +63,17 @@ jobs:
         uses: actions/cache@v4
         with:
           # Every round a cold runner re-downloaded the ~100MB Electron binary and
-          # dmg-builder's Python tooling before running anything — and two Apple
+          # electron-builder's tooling before running anything — and two Apple
           # Silicon rounds failed in the minute they spent doing it, with
           # "Downloading Electron binary..." as the last honest line in the log.
-          # These are the four platforms' own cache directories; a path that does
-          # not exist on a runner is skipped, not an error. The key is the
-          # lockfile hash and the architecture, so a dependency change cannot
-          # restore a stale binary, and nothing here is reused across platforms.
+          # The paths are the ones the env block above *forces* them to, not the
+          # runner's defaults; the key is the lockfile hash and the architecture, so
+          # a dependency change cannot restore a stale binary and nothing crosses
+          # platforms. Whether this actually saves is checked afterwards from the
+          # caches API, not assumed from a green run.
           path: |
-            ${{ runner.home }}/.cache/electron
-            ${{ runner.home }}/.cache/electron-builder
-            ${{ runner.home }}/Library/Caches/electron
-            ${{ runner.home }}/Library/Caches/electron-builder
-            ${{ runner.home }}/AppData/Local/electron/Cache
-            ${{ runner.home }}/AppData/Local/electron-builder/Cache
+            ${{ runner.temp }}/electron-cache
+            ${{ runner.temp }}/electron-builder-cache
           key: electron-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: electron-${{ runner.os }}-${{ matrix.arch }}-
       - name: Check host, version and docs
