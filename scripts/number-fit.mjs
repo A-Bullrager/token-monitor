@@ -256,6 +256,12 @@ const MEASURE = `(() => {
       text: node.textContent.trim(),
       inline: node.style.fontSize || '',
       size: getComputedStyle(node).fontSize,
+      // Both forms of the same fact: the raw attribute and the CSSOM view of it.
+      // A runner that reports an inline size the page is not rendering needs
+      // those in the artifact, because the difference between "the fitter wrote
+      // nothing" and "the page has not recalculated yet" is invisible otherwise.
+      css: node.style.cssText,
+      attr: node.getAttribute('style') || '',
       client: node.clientWidth, scroll: node.scrollWidth,
       // Distinguishes "the app never called its fitter" (function absent, or
       // renderStrip returned early) from "it called it and concluded the text
@@ -491,8 +497,36 @@ async function runOne(locale, view) {
         // the shrink in the cascade with the attribute empty, and CI showed that
         // on one runner. Nothing else in the app puts 11.2px on this element.
         if (today.shown && !(parseFloat(today.size) < 16)) {
-          entry.findings.push(`${label} @ ${fixture.name}: the ¥123,456.78 figure was never shrunk, ` +
-            `after ${passes} watch passes — ${JSON.stringify(today)}`)
+          // macOS ARM later reported the opposite shape: the inline attribute said
+          // 11.2px, the used size still said 16px, three watch passes after the
+          // stress. That is not the same failure as a fitter that never ran, and
+          // calling it that sent six earlier rounds looking in the wrong place. So
+          // the page is read again two frames later, and only a disagreement that
+          // survives the frames is treated as the card really showing an unshrunk
+          // number. Both readings go into the report either way.
+          const recheck = await evaluate(`new Promise((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              const node = document.getElementById('stripToday')
+              resolve(node ? {
+                inline: node.style.fontSize,
+                size: getComputedStyle(node).fontSize,
+                client: node.clientWidth,
+                scroll: node.scrollWidth
+              } : null)
+            }))
+          })`)
+          const converged = Boolean(recheck) && parseFloat(recheck.size) < 16
+          entry.fixtures[fixture.name].fitLag = {
+            first: { inline: today.inline, size: today.size, client: today.client, scroll: today.scroll },
+            recheck, converged
+          }
+          if (converged) {
+            console.log(`  note: ${label} @ ${fixture.name}: the fit was applied (${today.inline}) but the page still ` +
+              `rendered ${today.size} at the grading instant; two frames later it read ${recheck.size}`)
+          } else {
+            entry.findings.push(`${label} @ ${fixture.name}: the ¥123,456.78 figure was never shrunk, ` +
+              `after ${passes} watch passes and again two frames later — ${JSON.stringify(today)} / ${JSON.stringify(recheck)}`)
+          }
         }
       }
       // Fitting must be invisible until it is needed: if the demo account
