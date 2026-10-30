@@ -6,3 +6,8 @@ shots/ui-report.json
 shots/i18n/
 shots/packaged/
 shots/numbers-report.json
+# The number check writes per-fixture screenshots here when run with
+# --keep-shots / --all-shots. They diagnose one platform's metrics for one
+# afternoon and are never a deliverable, so they must not show up as untracked
+# noise the way shots/i18n/ and shots/packaged/ already do not.
+shots/numbers/
