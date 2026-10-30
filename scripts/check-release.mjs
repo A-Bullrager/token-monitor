@@ -34,4 +34,35 @@ if (refType === 'tag') {
   assert.equal(refName, `v${pkg.version}`, 'release tag must be v + package.json version')
 }
 
+// Every bundled font must ship the paperwork its own licence asks for. This is
+// not decoration: the MiSans agreement, clause 2(4), requires the copyright
+// notice and the agreement itself to be retained in any copy of the font, and
+// the subset is a copy that travels with the app and with this repository. A
+// font file added without its licence would otherwise pass every functional
+// check in the suite — nothing at runtime notices a missing PDF.
+const fontDir = path.join(root, 'renderer', 'assets', 'font')
+const licenceDir = path.join(fontDir, 'licenses')
+const fonts = fs.existsSync(fontDir)
+  ? fs.readdirSync(fontDir).filter((file) => /\.(woff2?|ttf|otf)$/i.test(file))
+  : []
+const licences = fs.existsSync(licenceDir) ? fs.readdirSync(licenceDir) : []
+assert.ok(fonts.length, 'no bundled fonts found — has the font directory moved?')
+assert.ok(licences.length, 'renderer/assets/font/licenses is missing or empty')
+for (const font of fonts) {
+  const family = font.split(/[-_.]/)[0].toLowerCase()
+  // Matched anywhere in the name, not as a prefix: Inter's licence travels as
+  // OFL-Inter.txt, which is the conventional way to name an OFL file.
+  const paired = licences.filter((file) => file.toLowerCase().includes(family))
+  assert.ok(paired.length, `${font} is bundled with no licence file for its family in licenses/`)
+  if (family === 'misans') {
+    // The summary is ours; the agreement is Xiaomi's text, and a link can move.
+    assert.ok(paired.some((file) => /\.pdf$/i.test(file)),
+      'MiSans requires the agreement itself beside it (clause 2(4)) — no PDF in licenses/')
+    const notice = read('renderer', 'assets', 'font', 'licenses', 'MiSans-Notice.txt')
+    assert.match(notice, /revocable/, 'the MiSans notice must state that the grant is revocable')
+    assert.doesNotMatch(notice, /符合 ?MiSans ?协议|complies with the MiSans licence/,
+      'the MiSans notice must not claim compliance the agreement does not settle')
+  }
+}
+
 console.log(`Release metadata consistent: v${pkg.version}${refType === 'tag' ? ` (tag ${refName})` : ''}`)

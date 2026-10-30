@@ -1,49 +1,81 @@
 MiSans 字体知识产权许可协议 · 使用声明
 =====================================
 
-本项目在界面中使用 MiSans 字体（由小米科技有限责任公司提供，字形由汉仪字体制作），
-并随仓库分发其子集化后的 Web 字体文件：
+随附文件
+--------
+MiSans-License.pdf    官方协议原文（双语 PDF，元数据显示 2023-10-19 版，标题
+                      "MiSans Font Intellectual Property License Agreement"）。
+                      协议第 2 条第 4 款要求在 MiSans 字体的任何副本中保留
+                      版权声明与本协议，因此原文与字体文件放在一起分发。
 
-    renderer/assets/font/MiSans-subset.woff2
-
-该文件由官方发布的 MiSans 可变字体按本项目界面实际用到的字符做子集化（subset）
-生成，未对任何字形轮廓进行修改、重绘或再设计。
-
-授权来源（官方页面与协议原文）
-------------------------------
+官方来源
+--------
 - 字体下载与协议：https://hyperos.mi.com/font/download
-- 协议原文（PDF）：
+- 协议原文（即上面随附的 PDF）：
   https://hyperos.mi.com/font-download/MiSans字体知识产权许可协议.pdf
 - 字体介绍：https://hyperos.mi.com/font/about
 
-协议要点（以官方原文为准）
---------------------------
-1. 许可方授予一份不可转让、非独占、免版税、全球性的版权许可，允许将 MiSans 用于
-   创作成果（包括应用 App 等），并有权分发或出售该作品。
-2. 不得单独将 MiSans 字体或其组件对外租赁、再许可、给予、出借或进一步分发字体
-   软件或其任何副本，也不得重新分发或售卖字体本身。本仓库中的字体文件仅作为
-   Token Monitor 界面的组成部分随应用一起提供，不作为独立字体产品分发。
-3. 不得对 MiSans 字体或其任何单独组件进行改编或二次开发。本项目仅做字符子集化，
-   未改动字形。
-4. 应在软件中特别注明使用了 MiSans 字体。本声明、README 的「多语言与字体」一节，
-   以及应用内「设置 → 关于」中的
-   “Fonts: Inter (SIL OFL 1.1) · MiSans (Xiaomi, royalty-free commercial license)”
-   共同构成该注明。
+本项目分发的是什么
+------------------
+    renderer/assets/font/MiSans-subset.woff2
 
-MiSans Font Intellectual Property License — usage notice
----------------------------------------------------------
-This project uses the MiSans font family provided by Xiaomi Inc. (lettering by
-Hanyi Fonts). The shipped `MiSans-subset.woff2` is a character subset of the
-officially published variable font; no glyph outline was modified, redrawn or
-re-designed. The font is distributed only as part of the Token Monitor user
-interface, never as a standalone font product, and the software explicitly
-credits MiSans as required by the agreement above.
+由官方发布的 MiSans 可变字体（内部名 "MiSans VF"，版权行 "Copyright © 2020-2023
+Beijing Xiaomi Mobile Software Co.,Ltd."，制作署名 Hanyi Fonts）按本项目界面实际
+用到的字符做子集化得到的 Web 字体。字形轮廓未做任何修改、重绘或再设计。
 
-The authoritative text is the official agreement linked above; if this notice
-and that agreement ever disagree, the official agreement prevails.
+协议怎么说（英文摘自随附 PDF 第 2 条；完整文本以 PDF 为准）
+------------------------------------------------------------
+授权性质："…a non-transferable, non-exclusive, royalty-free, revocable, and
+global copyright license…" —— 其中 revocable（可撤销）一词在本声明的早期版本里
+被漏掉了，现已按原文补上；协议第 5 条另规定违反条款时小米可终止并追责。
+
+- 2(1) 注明义务："You shall specifically indicate in the Software that You are
+  using MiSans fonts." —— 由本声明、README 的「多语言与字体」一节，以及应用内
+  「设置 → 关于」中的
+  “Fonts: Inter (SIL OFL 1.1) · MiSans (Xiaomi, royalty-free commercial license)”
+  共同满足。
+- 2(2) "You shall not adapt or redevelop MiSans fonts or any of their individual
+  components."（不得改编或二次开发字体或其单独组件）
+- 2(3) "You shall not individually rent, sublicense, give, loan, or further
+  distribute the MiSans fonts or their components, or any copies thereof, nor
+  shall you redistribute or sell them. This restriction does not apply to any
+  other work that You create using MiSans fonts. For example, if You use MiSans
+  fonts to create promotional materials, logos, applications (Apps), etc., You
+  shall have the right to distribute or sell that work."
+- 2(4) "You shall retain the copyright notice and this Agreement in any copies
+  of MiSans fonts." —— 由随附的 MiSans-License.pdf 与本声明满足。
+- 2(5) 不得用于非法目的。
+
+已经确定的部分
+--------------
+把 MiSans 用在应用里并分发/出售该应用，是 2(3) 明文允许的：协议把
+"applications (Apps)" 当作使用字体创作的成果，不受"不得单独分发字体副本"的限制。
+署名义务与"随副本保留协议"的义务均已履行。
+
+仍未解决的部分（本文件不声称已经合规）
+--------------------------------------
+1. 子集化是否落入 2(2) 禁止的"改编或二次开发"。协议没有定义这两个词，也没有提到
+   subset；把可变字体裁剪并重编码为 woff2 至少改动了字体文件本身（尽管未动字形）。
+   "只做子集、未改字形"是本项目的读法，不是协议写明的许可。
+2. 同一问题在仓库这一层更突出：随应用分发安装包属于 2(3) 的成果分发，而公开 Git
+   仓库里那个可被单独下载的 .woff2，离"单独分发字体副本"要近得多。这是当前做法
+   最薄弱的一环。
+3. 该 woff2 的 OS/2.fsType = 8（Preview & Print），即字体自身声明的嵌入等级不含
+   "随应用安装/可编辑嵌入"。浏览器加载 webfont 一般不看这一位，但它是独立于协议
+   文本的事实，应当记录而不是隐藏。
+
+要关闭第 1、2 点，需要向小米取得书面许可确认（协议第 7.2 条给出许可咨询联系方式），
+或改为在构建时拉取官方未改动的字体文件、不在仓库中留下可独立下载的字体副本。
+两者都还没做，所以这里不下"合规"的结论。
 
 Inter 字体（同目录 OFL-Inter.txt）
 ----------------------------------
     renderer/assets/font/Inter-subset.woff2
-Inter 由 rsms 提供，采用 SIL Open Font License 1.1，允许自由使用、子集化与再分发，
-前提是保留许可证声明与版权声明。完整协议见同目录 `OFL-Inter.txt`。
+
+rsms 提供，内部名 "Inter Variable"，采用 SIL Open Font License 1.1，许可证全文
+随附于 `OFL-Inter.txt`。该副本没有声明 Reserved Font Name，OS/2.fsType = 0
+（Installable），子集化与随应用再分发都是 OFL 1.1 明确允许的行为（前提是保留
+许可证与版权声明，已满足）。这一项没有未决问题。
+
+权威文本以随附的 MiSans-License.pdf（及其官方链接版本）为准；本声明与协议原文
+若冲突，以协议原文为准。
