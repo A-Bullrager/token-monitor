@@ -3194,13 +3194,6 @@ body.theme-dark .panel::before {
   --morph-ease: cubic-bezier(0.3, 0.7, 0.3, 1);
 }
 
-/* The card is laid out once at the larger of the two heights and the window
-   reveals it: see the measurement in switchView. Without this every window
-   step re-laid-out the whole card and the content trailed the frame edge. */
-body.morphing .panel {
-  height: var(--morph-panel-h, 100%);
-}
-
 body.morphing .strip,
 body.morphing .deck {
   /* flex, not block: both views are column layouts.

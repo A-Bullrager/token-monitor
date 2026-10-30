@@ -431,6 +431,8 @@ try {
           t: Math.round(elapsed),
           morphing: document.body.classList.contains('morphing'),
           panel: height,
+          // The inline height the morph pins the card with; empty outside a morph.
+          pin: document.getElementById('panel').style.height || '',
           // The window edge is what moves now; the card is laid out once and
           // revealed, so the two series say different things and both are needed.
           win: window.innerHeight,
