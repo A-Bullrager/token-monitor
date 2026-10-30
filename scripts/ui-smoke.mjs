@@ -431,6 +431,9 @@ try {
           t: Math.round(elapsed),
           morphing: document.body.classList.contains('morphing'),
           panel: height,
+          // The window edge is what moves now; the card is laid out once and
+          // revealed, so the two series say different things and both are needed.
+          win: window.innerHeight,
           strip: Math.round(strip.getBoundingClientRect().height),
           deck: Math.round(deck.getBoundingClientRect().height),
           so: +getComputedStyle(strip).opacity,
@@ -450,16 +453,23 @@ try {
 
   const gradeMorph = (run) => {
     const heights = run.samples.map((s) => s.panel)
+    const wins = run.samples.map((s) => s.win ?? s.panel)
     const resting = heights.at(-1)
     const delta = run.before - resting
-    // Frames the crossfade is definitely running in; if the class had already
-    // gone when the edge moved, use the frames where the edge was moving.
     const fading = run.samples.filter((s) => s.morphing)
-    const moving = fading.length
-      ? fading
-      : run.samples.filter((s) => s.panel < run.before - 1 && s.panel > resting + 1)
+    const moving = fading.length ? fading : run.samples
     const frameWindow = moving.length ? moving : run.samples
-    const steps = heights.slice(1).map((h, i) => Math.abs(h - heights[i]))
+    // The edge the reader watches is the window's. The card is pinned during the
+    // morph and revealed by that edge, so the two series are graded separately:
+    // the window has to arrive in steps, the panel must not.
+    const winSteps = wins.slice(1).map((h, i) => Math.abs(h - wins[i]))
+    const winFrom = wins[0]
+    const winTo = wins.at(-1)
+    let panelChanges = 0
+    for (let i = 1; i < run.samples.length; i++) {
+      if (!run.samples[i].morphing) continue
+      if (run.samples[i].panel !== run.samples[i - 1].panel) panelChanges++
+    }
     return {
       duration: boot.morphMs,
       sampledUntil: run.samples.at(-1)?.t,
@@ -470,10 +480,16 @@ try {
       panelDelta: delta,
       panelFrom: heights[0],
       panelTo: resting,
-      // Distinct heights strictly between the two resting sizes: proof that
-      // the change arrived spread over frames instead of in one jump.
-      intermediate: new Set(heights.filter((h) => h < run.before - 1 && h > resting + 1)).size,
-      biggestStep: steps.length ? Math.max(...steps) : 0,
+      winFrom,
+      winTo,
+      // Distinct window sizes strictly between the two resting ones: proof the
+      // reveal arrived spread over frames instead of in one jump.
+      winIntermediate: new Set(wins.filter((h) => h < winFrom - 1 && h > winTo + 1)).size,
+      biggestStep: winSteps.length ? Math.max(...winSteps) : 0,
+      // How many times the card's own box changed while morphing. The window
+      // resize is cheap; re-laying-out the whole card on every step is what made
+      // the content trail the edge by 60-100ms, so the architecture is graded.
+      panelChanges,
       dimmest: Math.min(...frameWindow.map((s) => Math.max(s.so, s.dop))),
       deckHeights: [Math.min(...frameWindow.map((s) => s.deck)), Math.max(...frameWindow.map((s) => s.deck))],
       stripHeights: [Math.min(...frameWindow.map((s) => s.strip)), Math.max(...frameWindow.map((s) => s.strip))]
@@ -481,14 +497,14 @@ try {
   }
 
   const triggerCollapse = "document.querySelector('.deck-head [data-action=\"collapse\"]').click()"
-  const isAnimated = (grade) => grade.panelDelta > 0 && grade.intermediate >= 1 &&
-    grade.panelFrom - grade.panelTo >= grade.panelDelta * 0.75
+  const isAnimated = (grade) => grade.panelDelta > 0 && grade.winIntermediate >= 3 &&
+    Math.abs(grade.winFrom - grade.winTo) >= grade.panelDelta * 0.75
   const attempts = []
   let graded = null
   for (let attempt = 0; attempt < 3; attempt++) {
     const grade = gradeMorph(await sampleMorph(triggerCollapse))
     attempts.push(grade)
-    if (!graded || grade.intermediate > graded.intermediate) graded = grade
+    if (!graded || grade.winIntermediate > graded.winIntermediate) graded = grade
     if (isAnimated(grade)) break
     await sleep(400)
   }
@@ -496,20 +512,27 @@ try {
   // Every attempt is kept: a pass that only succeeded on the third try is
   // evidence about the runner, not a hidden retry.
   report.firstLaunch.morphAttempts = attempts.map((grade) => ({
-    frames: grade.frames, fadingFrames: grade.fadingFrames, intermediate: grade.intermediate,
+    frames: grade.frames, fadingFrames: grade.fadingFrames, winIntermediate: grade.winIntermediate, panelChanges: grade.panelChanges,
     panelFrom: grade.panelFrom, panelTo: grade.panelTo, panelDelta: grade.panelDelta,
     sampledUntil: grade.sampledUntil
   }))
   assert.ok(graded.frames >= 3, `morph sampled only ${graded.frames} frames`)
   assert.ok(graded.panelDelta > 0, `collapse did not shrink the panel: ${graded.restingPanelFrom} -> ${graded.restingPanelTo}`)
   assert.ok(
-    graded.panelFrom - graded.panelTo >= graded.panelDelta * 0.75,
-    `window did not animate most of its actual ${graded.panelDelta}px change: ${graded.panelFrom} -> ${graded.panelTo} ` +
+    Math.abs(graded.winFrom - graded.winTo) >= graded.panelDelta * 0.75,
+    `window did not travel most of its actual ${graded.panelDelta}px: ${graded.winFrom} -> ${graded.winTo} ` +
     `(after ${attempts.length} attempt(s): ${JSON.stringify(report.firstLaunch.morphAttempts)})`
   )
   assert.ok(
-    graded.intermediate >= 1,
-    `morph must include an intermediate panel size, not just an instant jump (biggest single step ${graded.biggestStep}px of ${graded.panelDelta}px)`
+    graded.winIntermediate >= 3,
+    `the reveal must arrive in steps, not one jump (intermediate window sizes ${graded.winIntermediate}, biggest step ${graded.biggestStep}px of ${graded.panelDelta}px)`
+  )
+  // The card is laid out once at the larger height and revealed by the moving
+  // edge. A panel that resizes per frame is the 60-100ms content trail this
+  // architecture exists to prevent, so it is graded, not just described.
+  assert.ok(
+    graded.panelChanges <= 1,
+    `the card was re-laid-out ${graded.panelChanges} times during one morph; it must be pinned and revealed`
   )
   assert.ok(
     graded.dimmest > 0.45,

@@ -1294,6 +1294,14 @@ async function switchView(next, { persist = true } = {}) {
   const targetPanel = state.formHeights?.[target] ? Math.round(state.formHeights[target] - chrome) : 0
   document.body.style.setProperty('--morph-out-h', `${Math.round(outgoing.getBoundingClientRect().height)}px`)
   document.body.style.setProperty('--morph-in-h', targetPanel > 0 ? `${targetPanel}px` : '100%')
+  // The card is laid out once, at the larger of the two heights, and the window
+  // then only *reveals* it. Measured before changing this: with the panel at
+  // height:100% every one of the ~70 window steps re-laid-out the whole card,
+  // and the content ran 60-100ms behind the frame edge (one resize of this
+  // window takes that long to reach the page). Pinning the height means the
+  // moving edge clips a card that is already final, so there is nothing to lag.
+  document.body.style.setProperty('--morph-panel-h',
+    `${Math.max(Math.round(panelBox.height), targetPanel)}px`)
   // Stack both views, then let the incoming one land while the window moves.
   // No frame of this ever shows an empty card.
   document.body.classList.add('morphing', `morph-from-${source}`, `morph-to-${target}`)

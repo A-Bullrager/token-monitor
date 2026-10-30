@@ -3182,6 +3182,25 @@ body.theme-dark .panel::before {
    animates its bounds, so the card is never an empty white box. Each view
    holds its own resting layout; the moving bottom edge of the card is what
    reveals the incoming one and clips the outgoing one away. */
+
+/* One curve for every channel of the morph — the window tween in main.js, the
+   opacities and the scales here. Ease-out, not the old Material ease-in-out:
+   that curve spent its first ~100ms barely moving, which the eye reads as
+   hesitation before anything has happened. This one leaves immediately and
+   spends its length settling, which is what "the card opened" should feel like.
+   Duplicated in MORPH_EASE (main.js) because the main process cannot read a CSS
+   variable; both carry this comment. */
+:root {
+  --morph-ease: cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+/* The card is laid out once at the larger of the two heights and the window
+   reveals it: see the measurement in switchView. Without this every window
+   step re-laid-out the whole card and the content trailed the frame edge. */
+body.morphing .panel {
+  height: var(--morph-panel-h, 100%);
+}
+
 body.morphing .strip,
 body.morphing .deck {
   /* flex, not block: both views are column layouts.
@@ -3202,8 +3221,8 @@ body.morphing .deck {
   /* Same curve and duration the main process resizes the window with
      (--morph-ms is pushed from bootstrap; the fallback keeps the showcase page honest). */
   transition:
-    opacity var(--morph-ms, 300ms) cubic-bezier(0.4, 0, 0.2, 1),
-    transform var(--morph-ms, 300ms) cubic-bezier(0.4, 0, 0.2, 1);
+    opacity var(--morph-ms, 300ms) var(--morph-ease),
+    transform var(--morph-ms, 300ms) var(--morph-ease);
 }
 
 body.morphing.morph-from-strip .strip,

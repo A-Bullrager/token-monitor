@@ -172,7 +172,12 @@ function cubicBezier(p1x, p1y, p2x, p2y) {
   }
 }
 
-const MORPH_EASE = cubicBezier(0.4, 0, 0.2, 1)
+// Ease-out, not the Material ease-in-out this used to be: that curve barely
+// moved for its first ~100ms, which reads as hesitation before the card has
+// started to open. The renderer's transitions carry the same curve as
+// --morph-ease in styles.css; a CSS variable cannot be read from here, so the
+// literal is duplicated and both copies say so.
+const MORPH_EASE = cubicBezier(0.3, 0.7, 0.3, 1)
 // Single source of truth: the renderer reads this from bootstrap and drives
 // its crossfade with the same number. TM_MORPH_MS exists for slow-motion
 // frame capture (node scripts/morph-cast.mjs).
@@ -180,29 +185,42 @@ const MORPH_MS = Number(process.env.TM_MORPH_MS) || 300
 // TM_MORPH_DEBUG=1 prints every resize tick: node scripts/morph-cast.mjs uses
 // it to tell "the window never moved" apart from "the window moved too slowly".
 const MORPH_TRACE = process.env.TM_MORPH_DEBUG === '1'
+// The tween's clock, measured rather than assumed. `setInterval(fn, 1000/60)` in
+// Electron's main process does not wake at 60Hz: with a blank page *and* with a
+// heavy one it woke every ~30ms, so a 300ms morph got 10 window updates of
+// wildly different size (0, 16, 74, 192, 132, 108, 66, 40, 24, 12, 4 pixels).
+// A self-rescheduling `setTimeout` achieved ~10ms. The OS was never the problem
+// — one `setBounds` costs 1–5ms — but the window edge is the largest visual
+// change in this animation, and a 30Hz clock on it is exactly what reads as
+// stutter. 6ms plus the loop's own work lands near one display frame without
+// spending main-process time on sizes that round to the same rectangle.
+const MORPH_FRAME_MS = Number(process.env.TM_MORPH_FRAME) || 6
 
 function animateWindowBounds(target, duration = MORPH_MS) {
   return new Promise((resolve) => {
     if (!mainWindow) return resolve()
     if (boundsTimer) {
-      clearInterval(boundsTimer)
+      clearTimeout(boundsTimer)
       boundsTimer = null
       boundsResolve?.()
       boundsResolve = null
     }
     const start = mainWindow.getBounds()
-    const startedAt = Date.now()
+    const startedAt = performance.now()
     if (MORPH_TRACE) console.log(`[morph +0ms] start ${start.width}x${start.height} -> ${target.width}x${target.height}`)
     boundsResolve = resolve
+    let applied = { ...start }
+    const stop = () => {
+      boundsTimer = null
+      boundsResolve = null
+    }
     const tick = () => {
       if (!mainWindow) {
-        clearInterval(boundsTimer)
-        boundsTimer = null
-        boundsResolve = null
+        stop()
         resolve()
         return
       }
-      const progress = Math.min(1, (Date.now() - startedAt) / duration)
+      const progress = Math.min(1, (performance.now() - startedAt) / duration)
       const eased = MORPH_EASE(progress)
       const bounds = {
         x: Math.round(start.x + (target.x - start.x) * eased),
@@ -210,17 +228,22 @@ function animateWindowBounds(target, duration = MORPH_MS) {
         width: Math.round(start.width + (target.width - start.width) * eased),
         height: Math.round(start.height + (target.height - start.height) * eased)
       }
-      mainWindow.setBounds(bounds)
-      if (MORPH_TRACE) console.log(`[morph +${Date.now() - startedAt}ms] tick ${bounds.width}x${bounds.height} progress=${progress.toFixed(2)}`)
+      // A redundant SetWindowPos costs the same as one that matters, and at this
+      // cadence the easing rounds to the same rectangle for two ticks in a row.
+      if (bounds.width !== applied.width || bounds.height !== applied.height ||
+          bounds.x !== applied.x || bounds.y !== applied.y) {
+        mainWindow.setBounds(bounds)
+        applied = bounds
+        if (MORPH_TRACE) console.log(`[morph +${Math.round(progress * duration)}ms] tick ${bounds.width}x${bounds.height} progress=${progress.toFixed(2)}`)
+      }
       if (progress >= 1) {
-        clearInterval(boundsTimer)
-        boundsTimer = null
-        boundsResolve = null
+        stop()
         mainWindow.setBounds(target)
         resolve()
+        return
       }
+      boundsTimer = setTimeout(tick, MORPH_FRAME_MS)
     }
-    boundsTimer = setInterval(tick, 1000 / 60)
     tick()
   })
 }
