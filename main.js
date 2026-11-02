@@ -210,6 +210,7 @@ function animateWindowBounds(target, duration = MORPH_MS) {
     if (MORPH_TRACE) console.log(`[morph +0ms] start ${start.width}x${start.height} -> ${target.width}x${target.height}`)
     boundsResolve = resolve
     let applied = { ...start }
+    let ticks = 0
     const stop = () => {
       boundsTimer = null
       boundsResolve = null
@@ -234,11 +235,22 @@ function animateWindowBounds(target, duration = MORPH_MS) {
           bounds.x !== applied.x || bounds.y !== applied.y) {
         mainWindow.setBounds(bounds)
         applied = bounds
-        if (MORPH_TRACE) console.log(`[morph +${Math.round(progress * duration)}ms] tick ${bounds.width}x${bounds.height} progress=${progress.toFixed(2)}`)
+        ticks++
+        // The wall stamp, not the intended one: "the loop was scheduled 50 times
+        // and the OS applied every size" and "the loop only woke 6 times" look the
+        // same in progress terms, and only the elapsed column tells them apart.
+        if (MORPH_TRACE)
+          console.log(
+            `[morph +${Math.round(performance.now() - startedAt)}ms] tick ${bounds.width}x${bounds.height} intended=${Math.round(progress * duration)}ms steps=${ticks}`
+          )
       }
       if (progress >= 1) {
         stop()
         mainWindow.setBounds(target)
+        if (MORPH_TRACE)
+          console.log(
+            `[morph +${Math.round(performance.now() - startedAt)}ms] done ${target.width}x${target.height} steps=${ticks} scheduled=${MORPH_FRAME_MS}ms duration=${duration}ms`
+          )
         resolve()
         return
       }

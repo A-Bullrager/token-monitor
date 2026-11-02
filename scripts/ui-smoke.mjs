@@ -78,6 +78,14 @@ async function launch(label, { locale = 'zh' } = {}) {
     stderr += String(chunk)
     if (stderr.length > 12000) stderr = stderr.slice(-12000)
   })
+  // The main process's own morph trace (TM_MORPH_DEBUG=1) lands on stdout. It is
+  // the only witness of what the *window* did, as opposed to what a possibly
+  // throttled renderer noticed, so it is kept and parsed rather than dropped.
+  let stdout = ''
+  child.stdout.on('data', (chunk) => {
+    stdout += String(chunk)
+    if (stdout.length > 200000) stdout = stdout.slice(-200000)
+  })
   child.on('exit', () => {
     child = null
   })
@@ -179,7 +187,7 @@ async function launch(label, { locale = 'zh' } = {}) {
   }
 
   await call('Runtime.enable')
-  session = { call, evaluate, waitFor, ws, stderr: () => stderr }
+  session = { call, evaluate, waitFor, ws, stderr: () => stderr, stdout: () => stdout }
   return session
 }
 
@@ -420,15 +428,28 @@ try {
       const deck = document.getElementById('deckView')
       const panel = document.getElementById('panel')
       const before = Math.round(panel.getBoundingClientRect().height)
-      // A cap that scales with the configured duration would blind the sampler
-      // on a very short one, so keep a floor: enough frames to tell an
-      // animation from a jump no matter what the product is set to.
-      const cap = Math.max(1200, ${boot.morphMs} * 4)
+      // How long we are willing to watch, not how good the animation has to be.
+      // A cap that scales with the configured duration would blind the sampler on
+      // a very short one, so keep a floor; and the floor has to be well past the
+      // morph, because on the Apple Silicon runner the pinned card is only
+      // released after the main process finishes a resize storm that itself took
+      // ~1.4s, and a 1200ms window stopped mid-flight and reported "collapse did
+      // not shrink the panel" about a card whose final height was the correct 140
+      // (the same artifact's lastState said so). Widening the watch cannot turn a
+      // stalled morph into a pass: every assertion below reads only what was seen.
+      const cap = Math.max(4000, ${boot.morphMs} * 10)
       const step = () => {
         const elapsed = performance.now() - t0
         const height = Math.round(panel.getBoundingClientRect().height)
+        const last = samples.at(-1)
         samples.push({
           t: Math.round(elapsed),
+          // The renderer's own pulse. If this is hundreds of milliseconds while
+          // the window side reports a tick every few ms, the freeze is here, not
+          // there — and a hidden or unfocused page explains why.
+          gap: last ? Math.round(elapsed - last.t) : 0,
+          vis: document.visibilityState,
+          has: document.hasFocus(),
           morphing: document.body.classList.contains('morphing'),
           panel: height,
           // The inline height the morph pins the card with; empty outside a morph.
@@ -506,7 +527,15 @@ try {
       panelSeries: run.samples.map((s) => `${s.t}:${s.panel}${s.pin ? '[' + s.pin + ']' : ''}/${s.win}${s.morphing ? '' : '.'}`),
       dimmest: Math.min(...frameWindow.map((s) => Math.max(s.so, s.dop))),
       deckHeights: [Math.min(...frameWindow.map((s) => s.deck)), Math.max(...frameWindow.map((s) => s.deck))],
-      stripHeights: [Math.min(...frameWindow.map((s) => s.strip)), Math.max(...frameWindow.map((s) => s.strip))]
+      stripHeights: [Math.min(...frameWindow.map((s) => s.strip)), Math.max(...frameWindow.map((s) => s.strip))],
+      // Is this page even producing frames? A runner that hands the renderer one
+      // frame per 250ms cannot show a stepwise reveal, and every "the window
+      // jumped" reading has to be weighed against that. The visibility state is
+      // the usual suspect: Chromium throttles a hidden page's animation frames.
+      frameGaps: run.samples.slice(1).map((s) => s.gap),
+      worstFrameGap: run.samples.length > 1 ? Math.max(...run.samples.slice(1).map((s) => s.gap)) : 0,
+      visibility: [...new Set(run.samples.map((s) => s.vis))],
+      focused: run.samples.every((s) => s.has === true)
     }
   }
 
@@ -530,8 +559,77 @@ try {
     panelFrom: grade.panelFrom, panelTo: grade.panelTo, panelDelta: grade.panelDelta,
     sampledUntil: grade.sampledUntil
   }))
-  assert.ok(graded.frames >= 3, `morph sampled only ${graded.frames} frames`)
-  assert.ok(graded.panelDelta > 0, `collapse did not shrink the panel: ${graded.restingPanelFrom} -> ${graded.restingPanelTo}`)
+  // The window's side of the same animation, read from the main process's own
+  // trace (TM_MORPH_DEBUG=1, which CI sets for this matrix). `window.innerWidth`
+  // only changes when the renderer processes a resize, so a frozen page and a
+  // frozen mover are indistinguishable in the page samples; these lines are the
+  // mover's testimony.
+  await sleep(300)
+  const windowTicks = (() => {
+    const text = session.stdout?.() || ''
+    const num = (tail, key) => {
+      const hit = new RegExp(`${key}=(\\d+)`).exec(tail)
+      return hit ? Number(hit[1]) : null
+    }
+    const events = [...text.matchAll(/\[morph \+(\d+)ms\] (start|tick|done) (\d+)x(\d+)(.*)$/gm)].map((m) => ({
+      t: Number(m[1]),
+      kind: m[2],
+      w: Number(m[3]),
+      h: Number(m[4]),
+      intended: num(m[5], 'intended'),
+      steps: num(m[5], 'steps'),
+      scheduled: num(m[5], 'scheduled'),
+      duration: num(m[5], 'duration')
+    }))
+    if (!events.length) return { traceEnabled: false, events: [] }
+    // Split into animations at each start. The attempt loop can move the window
+    // more than once, so every animation is summarised and the last one is
+    // detailed: stdout is a stream, so the newest `done` line may not have been
+    // flushed yet, and a partial tail is still the evidence of this morph.
+    const animations = []
+    for (const e of events) {
+      if (e.kind === 'start') animations.push([e])
+      else if (animations.length) animations.at(-1).push(e)
+    }
+    const pair = animations.at(-1) || []
+    const last = pair.at(-1)
+    const moved = pair.filter((e) => e.kind === 'tick')
+    const gaps = pair.slice(1).map((e, i) => e.t - pair[i].t)
+    const drift = moved.filter((e) => e.intended !== null).map((e) => e.t - e.intended)
+    const summarise = (a) => {
+      const ticks = a.filter((e) => e.kind === 'tick')
+      const between = a.slice(1).map((e, i) => e.t - a[i].t)
+      return {
+        from: `${a[0].w}x${a[0].h}`,
+        to: `${a.at(-1).w}x${a.at(-1).h}`,
+        wallSpan: a.at(-1).t - a[0].t,
+        steps: ticks.length,
+        biggestGap: between.length ? Math.max(...between) : 0,
+        maxLateness: Math.max(0, ...ticks.filter((e) => e.intended !== null).map((e) => e.t - e.intended)),
+        endedWithDone: a.at(-1).kind === 'done'
+      }
+    }
+    return {
+      traceEnabled: true,
+      // How long the main process says its own animation took, against the
+      // duration it was asked for: 300ms of morph done in 1400ms of wall clock is
+      // starvation on that side, and a page freeze looks different from this.
+      animations: animations.map(summarise),
+      wallSpan: last?.t ?? null,
+      scheduled: last?.scheduled ?? null,
+      duration: last?.duration ?? null,
+      steps: moved.length,
+      endedWithDone: last?.kind === 'done',
+      biggestMainGap: gaps.length ? Math.max(...gaps) : 0,
+      // t - intended, per step: the loop's lateness, which grows when the process
+      // is not being scheduled and stays near zero when it is.
+      maxLateness: drift.length ? Math.max(...drift) : 0,
+      series: pair.map((e) => `${e.t}:${e.kind} ${e.w}x${e.h}${e.intended === null ? '' : ` want ${e.intended}`}`)
+    }
+  })()
+  report.firstLaunch.windowTicks = windowTicks
+  assert.ok(graded.frames >= 3, `morph sampled only ${graded.frames} frames (worst gap ${graded.worstFrameGap}ms, visibility ${JSON.stringify(graded.visibility)})`)
+  assert.ok(graded.panelDelta > 0, `collapse did not shrink the panel: ${graded.restingPanelFrom} -> ${graded.restingPanelTo} (watched ${graded.sampledUntil}ms; mover said ${windowTicks.traceEnabled ? `${windowTicks.steps} steps in ${windowTicks.wallSpan}ms` : 'nothing'})`)
   assert.ok(
     Math.abs(graded.winFrom - graded.winTo) >= graded.panelDelta * 0.75,
     `window did not travel most of its actual ${graded.panelDelta}px: ${graded.winFrom} -> ${graded.winTo} ` +
@@ -539,7 +637,8 @@ try {
   )
   assert.ok(
     graded.winIntermediate >= 3,
-    `the reveal must arrive in steps, not one jump (intermediate window sizes ${graded.winIntermediate}, biggest step ${graded.biggestStep}px of ${graded.panelDelta}px)`
+    `the reveal must arrive in steps, not one jump (intermediate window sizes ${graded.winIntermediate}, biggest step ${graded.biggestStep}px of ${graded.panelDelta}px; ` +
+    `page saw ${graded.frames} frames with a worst gap of ${graded.worstFrameGap}ms while ${windowTicks.traceEnabled ? `the mover ran ${windowTicks.steps} steps in ${windowTicks.wallSpan}ms (max lateness ${windowTicks.maxLateness}ms)` : 'no mover trace (TM_MORPH_DEBUG off)'}, visibility ${JSON.stringify(graded.visibility)}, focused ${graded.focused})`
   )
   // The card is laid out once at the larger height and revealed by the moving
   // edge. A panel that resizes per frame is the 60-100ms content trail this

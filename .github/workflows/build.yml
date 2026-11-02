@@ -40,6 +40,14 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       EXPECTED_PLATFORM: ${{ matrix.platform }}
       EXPECTED_ARCH: ${{ matrix.arch }}
+      # The main process prints one line per window step of a view morph, and the
+      # UI check reads those lines back into its report. Needed because the page
+      # cannot tell "the mover never stepped" apart from "the renderer was frozen":
+      # window.innerWidth only updates when a throttled page gets to process the
+      # resize, and the Apple Silicon runner produces ~4-6 frames per morph.
+      # Costs ~50 log lines per morph, changes no product behaviour and no test
+      # threshold.
+      TM_MORPH_DEBUG: '1'
       # Where the downloaders put their files, told to them rather than guessed
       # from each platform's profile directory: the first attempt cached
       # runner.home-based paths and saved nothing at all (checked through the
