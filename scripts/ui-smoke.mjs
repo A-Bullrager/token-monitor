@@ -58,6 +58,9 @@ async function launch(label, { locale = 'zh' } = {}) {
     electronBinary,
     [
       ...(usePackaged ? [] : [root]),
+      // For reproducing a runner's rendering conditions locally, e.g.
+      // TM_TEST_ELECTRON_ARGS=--disable-gpu. CI does not set this.
+      ...(process.env.TM_TEST_ELECTRON_ARGS || '').split(/\s+/).filter(Boolean),
       `--remote-debugging-port=${port}`,
       `--user-data-dir=${profileDir}`,
       // The suite asserts Chinese copy, so it pins the language instead of
@@ -472,7 +475,21 @@ try {
           strip: Math.round(strip.getBoundingClientRect().height),
           deck: Math.round(deck.getBoundingClientRect().height),
           so: +getComputedStyle(strip).opacity,
-          dop: +getComputedStyle(deck).opacity
+          dop: +getComputedStyle(deck).opacity,
+          // The animation's own clock, not ours. If this jumps across a 300ms
+          // animation in one frame, the engine finished the animation without
+          // painting it, and the two-position series is truthful rather than a
+          // sampling artefact.
+          animTime: (() => {
+            const list = document.getElementById('stage').getAnimations?.() || []
+            const hit = list.find((a) => a.animationName === 'morph-reveal')
+            return hit ? Math.round(Number(hit.currentTime) || 0) : -1
+          })(),
+          animState: (() => {
+            const list = document.getElementById('stage').getAnimations?.() || []
+            const hit = list.find((a) => a.animationName === 'morph-reveal')
+            return hit ? hit.playState : 'none'
+          })()
         })
         const previous = samples.at(-2)
         const stable = previous && previous.panel === height && previous.morphing === false
@@ -548,6 +565,13 @@ try {
       revealSteps: new Set(fading.map((s) => s.show)).size,
       revealTravel: fading.length ? Math.abs(fading.at(-1).show - fading[0].show) : 0,
       revealSeries: fading.map((s) => `${s.t}:${s.show}/${s.win}`),
+      // The engine's side of the same story: the animation clock at each sample,
+      // and whether the animation was ever in the "running" state. A clock that
+      // leaps from 0 to past the duration between two frames means the engine
+      // skipped the animation; a clock that steps evenly means it ran and the
+      // page painted the results.
+      animTimes: fading.map((s) => s.animTime),
+      animStates: [...new Set(fading.map((s) => s.animState))],
       dimmest: Math.min(...frameWindow.map((s) => Math.max(s.so, s.dop))),
       deckHeights: [Math.min(...frameWindow.map((s) => s.deck)), Math.max(...frameWindow.map((s) => s.deck))],
       stripHeights: [Math.min(...frameWindow.map((s) => s.strip)), Math.max(...frameWindow.map((s) => s.strip))],
@@ -606,6 +630,20 @@ try {
   // which CI sets for this matrix). Kept because the two witnesses answer
   // different questions: the page says whether the edge moved, the mover says
   // whether the stage was resized the number of times the design promises.
+  // What the rendering environment says about itself, once. Three runners ran a
+  // 300ms animation to completion between two 17ms frames while a fourth stepped
+  // it; before blaming the code again, record the animation's configured length
+  // and the GPU the page is actually using.
+  report.firstLaunch.motionEnv = await evaluate(`(() => {
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    return {
+      varMs: getComputedStyle(document.documentElement).getPropertyValue('--morph-ms').trim(),
+      reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      dpr: devicePixelRatio,
+      webgl: gl ? gl.getParameter(gl.RENDERER) + ' / ' + gl.getParameter(gl.VENDOR) : 'none'
+    }
+  })()`)
   await sleep(300)
   const morphResizes = (() => {
     const text = (session.stdout?.() || '').slice(graded.stdoutBefore)
@@ -636,7 +674,8 @@ try {
   assert.ok(
     graded.revealSteps >= 3,
     `the reveal must arrive in steps, not one jump (${graded.revealSteps} distinct edge positions over ${graded.fadingFrames} morphing frames, ` +
-    `worst frame gap ${graded.worstFrameGap}ms, visibility ${JSON.stringify(graded.visibility)}, focused ${graded.focused}, window saw ${graded.winIntermediate} intermediate sizes) — ${JSON.stringify(graded.revealSeries)}`
+    `worst frame gap ${graded.worstFrameGap}ms, visibility ${JSON.stringify(graded.visibility)}, focused ${graded.focused}, window saw ${graded.winIntermediate} intermediate sizes; ` +
+    `animation clock ${JSON.stringify(graded.animTimes)} state ${JSON.stringify(graded.animStates)}; env ${JSON.stringify(report.firstLaunch.motionEnv)}) — ${JSON.stringify(graded.revealSeries)}`
   )
   assert.ok(
     !morphResizes.traceEnabled || morphResizes.count <= 2 * attempts.length,
