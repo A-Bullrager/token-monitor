@@ -1278,7 +1278,7 @@ const MORPH_CLASSES = ['morphing', 'morph-to-deck', 'morph-to-strip', 'morph-fro
 
 function clearMorphClasses() {
   document.body.classList.remove(...MORPH_CLASSES)
-  for (const name of ['--morph-show-from', '--morph-show-to']) document.body.style.removeProperty(name)
+  for (const name of ['--morph-show-from', '--morph-show-to', '--morph-ms']) document.body.style.removeProperty(name)
   const panel = document.getElementById('panel')
   if (panel) {
     panel.style.height = ''
@@ -1327,6 +1327,17 @@ async function switchView(next, { persist = true } = {}) {
   const gutter = el.stage.clientHeight - panelBox.height
   const showFrom = Math.round(gutter + panelBox.height)
   const showTo = Math.round(gutter + (targetPanel > 0 ? targetPanel : panelBox.height))
+  // A user who asked the system for less motion gets the switch, not the
+  // performance: the card is still pinned (so nothing reflows and nothing
+  // flashes), but the reveal has zero length. This has to be explicit rather
+  // than left to the engine — and it was not: three of the four CI runners run
+  // with "reduce" (recorded in the report as motionEnv.reduced), the engine
+  // completes CSS animations instantly there, and the UI check read that as a
+  // broken morph. A preference the user set is not a bug to be graded away; it
+  // is a second correct behaviour, and the check now asserts it separately.
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+    document.body.style.setProperty('--morph-ms', '0ms')
+  }
   // Both ends are known before anything moves, which is the point: the reveal is
   // a CSS animation on .stage (and on the two views), not a transition. A
   // transition needs its start value committed by an earlier style update, and a
@@ -1362,10 +1373,11 @@ async function switchView(next, { persist = true } = {}) {
   state.switching = false
 }
 
-// The renderer's own morph length, as pushed by the main process. The CSS
-// transition and this waiting page have to agree on one number.
+// The renderer's own morph length, as pushed by the main process and possibly
+// shortened to zero on this morph by a reduced-motion preference. Read from the
+// body, because that is where switchView puts the override.
 function morphDuration() {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue('--morph-ms').trim()
+  const raw = getComputedStyle(document.body).getPropertyValue('--morph-ms').trim()
   const ms = Number.parseInt(raw, 10)
   return Number.isFinite(ms) && ms > 0 ? ms : 300
 }

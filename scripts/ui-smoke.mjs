@@ -589,6 +589,25 @@ try {
     }
   }
 
+  // What the rendering environment says about itself, once, before anything is
+  // emulated: three of the four CI runners run with "reduce" turned on at the OS
+  // level, and a page that correctly shortens its animation under that preference
+  // then looks like a broken morph to a check that only knows how to grade the
+  // animated path. Recorded rather than assumed.
+  report.firstLaunch.motionEnv = await evaluate(`(() => {
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    return {
+      varMs: getComputedStyle(document.documentElement).getPropertyValue('--morph-ms').trim(),
+      reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      dpr: devicePixelRatio,
+      webgl: gl ? gl.getParameter(gl.RENDERER) + ' / ' + gl.getParameter(gl.VENDOR) : 'none'
+    }
+  })()`)
+  // Grade the animated path under an explicit no-preference, on every runner, and
+  // the reduced path in its own scenario below. The environment's own setting no
+  // longer decides which behaviour gets tested.
+  await session.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] })
   const triggerCollapse = "document.querySelector('.deck-head [data-action=\"collapse\"]').click()"
   // What counts as an animated morph, and a deliberate change of judgement.
   //
@@ -630,20 +649,6 @@ try {
   // which CI sets for this matrix). Kept because the two witnesses answer
   // different questions: the page says whether the edge moved, the mover says
   // whether the stage was resized the number of times the design promises.
-  // What the rendering environment says about itself, once. Three runners ran a
-  // 300ms animation to completion between two 17ms frames while a fourth stepped
-  // it; before blaming the code again, record the animation's configured length
-  // and the GPU the page is actually using.
-  report.firstLaunch.motionEnv = await evaluate(`(() => {
-    const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
-    return {
-      varMs: getComputedStyle(document.documentElement).getPropertyValue('--morph-ms').trim(),
-      reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
-      dpr: devicePixelRatio,
-      webgl: gl ? gl.getParameter(gl.RENDERER) + ' / ' + gl.getParameter(gl.VENDOR) : 'none'
-    }
-  })()`)
   await sleep(300)
   const morphResizes = (() => {
     const text = (session.stdout?.() || '').slice(graded.stdoutBefore)
@@ -692,6 +697,34 @@ try {
       `the window came down to ${graded.winTo} in the page but the mover never reported a shrink to it — ${JSON.stringify(morphResizes.series)}`
     )
   }
+  // ── the same switch with motion turned down ───────────────────────────────
+  // A user preference, not a broken morph. The product pins the card and swaps
+  // the two forms with a zero-length reveal; this asserts exactly that, including
+  // that the switch is *not* animated. Without it the check silently graded
+  // whichever preference the runner happened to carry, and three runners carry
+  // "reduce".
+  await session.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+  await evaluate("document.querySelector('.strip-main[data-action=\"expand\"]').click()")
+  await waitFor('deck under reduced motion', `${viewExpr('view-deck')} && !${viewExpr('morphing')}`)
+  const quiet = gradeMorph(await sampleMorph(triggerCollapse))
+  report.firstLaunch.reducedMotion = {
+    revealSteps: quiet.revealSteps, revealFrom: quiet.revealFrom, revealTo: quiet.revealTo,
+    panelChanges: quiet.panelChanges, panelDelta: quiet.panelDelta, frames: quiet.frames,
+    winFrom: quiet.winFrom, winTo: quiet.winTo, animStates: quiet.animStates, revealSeries: quiet.revealSeries
+  }
+  await session.call('Emulation.setEmulatedMedia', { features: [] })
+  assert.ok(
+    quiet.panelDelta > 0,
+    `the reduced-motion switch must still land: card ${quiet.restingPanelFrom} -> ${quiet.restingPanelTo}, window ${quiet.winFrom} -> ${quiet.winTo} (${JSON.stringify(quiet.revealSeries)})`
+  )
+  assert.ok(
+    quiet.revealSteps <= 2,
+    `a reduced-motion preference must not be animated (${quiet.revealSteps} edge positions over ${quiet.fadingFrames} frames, clock ${JSON.stringify(quiet.animTimes)})`
+  )
+  assert.ok(
+    quiet.panelChanges <= 1,
+    `the card was re-laid-out ${quiet.panelChanges} times during a reduced-motion switch — ${JSON.stringify(quiet.panelMoves)}`
+  )
   // The card is laid out once at the larger height and revealed by the moving
   // edge. A panel that resizes per frame is the 60-100ms content trail this
   // architecture exists to prevent, so it is graded, not just described.
