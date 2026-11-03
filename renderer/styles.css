@@ -49,7 +49,16 @@
   --panel-edge: rgba(0, 0, 0, 0.06);
   --panel-highlight: rgba(255, 255, 255, 0.9);
   --shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05), 0 6px 14px rgba(0, 0, 0, 0.09);
-  --grain-opacity: 0;
+  /* The frost: a pane is not one colour. Light enters along the top edge, the
+     body of the glass is a milky cool white rather than paper white, and the
+     depth gathers toward the bottom where the pane thickens over the desk. */
+  --frost-light: #ffffff;
+  --frost-body: #f4f6fa;
+  --frost-deep: #e9ecf3;
+  --frost-bloom: rgba(255, 255, 255, 0.98);
+  --frost-depth: rgba(120, 136, 184, 0.22);
+  --frost-rim: rgba(60, 60, 67, 0.08);
+  --grain-opacity: 0.07;
   --stage-caption: #ffffff;
   --stage-muted: rgba(255, 255, 255, 0.72);
   --serif: var(--sans);
@@ -81,6 +90,16 @@ body.theme-dark {
   --panel-edge: rgba(255, 255, 255, 0.08);
   --panel-highlight: rgba(255, 255, 255, 0.08);
   --shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 2px 6px rgba(0, 0, 0, 0.35), 0 8px 16px rgba(0, 0, 0, 0.3);
+  /* The same pane smoked: the top catches a reflection of the room rather than
+     light through it, the body is charcoal with a blue cast, and the grain reads
+     brighter because screen blending scatters less per pixel over a dark field. */
+  --frost-light: #26262a;
+  --frost-body: #1f1f22;
+  --frost-deep: #141416;
+  --frost-bloom: rgba(255, 255, 255, 0.12);
+  --frost-depth: rgba(0, 0, 0, 0.45);
+  --frost-rim: rgba(255, 255, 255, 0.06);
+  --grain-opacity: 0.09;
 }
 
 * {
@@ -198,11 +217,26 @@ select,
   height: 100%;
   border-radius: 16px;
   border: 1px solid var(--panel-edge);
-  background:
-    radial-gradient(120% 90% at 18% 0%, var(--paper-2) 0%, var(--paper) 56%, var(--paper) 100%);
   box-shadow: var(--shadow);
   overflow: hidden;
   isolation: isolate;
+}
+
+/* The two light layers of the frost (the tokens are explained in the material
+   section below): the bloom where light enters along the top edge, and the cool
+   depth that gathers at the bottom of a thick pane.
+   z-index: -1 keeps the wash under the content and above the panel's own
+   background, inside the panel's stacking context (isolation: isolate). */
+.panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(140% 70% at 50% -12%, var(--frost-bloom) 0%, rgba(255, 255, 255, 0) 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 42%, var(--frost-depth) 100%);
 }
 
 .panel::before {
@@ -2349,28 +2383,46 @@ body {
 
 /* ── material ─────────────────────────────────────────────── */
 
+/* Frosted glass, drawn rather than borrowed.
+   The window is transparent and the card is the page's top surface: there is
+   nothing behind it to blur, so backdrop-filter would blur nothing, and letting
+   the desktop through would make the interface read as whatever wallpaper happens
+   to be behind it — per platform, per moment, per user. So the frost is built
+   from what a thick pane does to light instead: a bright band where light enters
+   along the top edge, a milky cool body that is not paper white (a bloom over
+   pure white is invisible, which is why this whole surface used to look flat),
+   depth that gathers toward the bottom, a hairline rim all round, and a grain
+   fine enough to scatter the flat fields without dirtying the text.
+   All of it is paint, so it is the same picture on Windows, macOS and Linux. */
 .panel {
   border-radius: 18px;
   border: 1px solid var(--panel-edge);
-  background: var(--paper);
+  background: linear-gradient(180deg, var(--frost-light) 0%, var(--frost-body) 55%, var(--frost-deep) 100%);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 28px rgba(0, 0, 0, 0.11);
 }
 
 body.theme-dark .panel {
-  background: var(--paper);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 28px rgba(0, 0, 0, 0.32);
 }
 
 .panel::before {
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 var(--frost-rim);
 }
 
 body.theme-dark .panel::before {
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 var(--frost-rim);
 }
 
+/* The pane's scatter. This layer used to be switched off, which is the honest
+   reason the card read as a flat sheet: without it the surface has no texture at
+   all. It is back at a low opacity and blended the way glass scatters — multiply
+   in the light theme, screen in the dark one (see .grain above). */
 .grain {
-  display: none;
+  display: block;
 }
 
 /* ── shared controls ──────────────────────────────────────── */
