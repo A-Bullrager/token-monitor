@@ -1274,11 +1274,11 @@ function setBodyView(view) {
   document.body.classList.toggle('view-deck', state.view === 'deck')
 }
 
-const MORPH_CLASSES = ['morphing', 'morph-run', 'morph-to-deck', 'morph-to-strip', 'morph-from-deck', 'morph-from-strip']
+const MORPH_CLASSES = ['morphing', 'morph-to-deck', 'morph-to-strip', 'morph-from-deck', 'morph-from-strip']
 
 function clearMorphClasses() {
   document.body.classList.remove(...MORPH_CLASSES)
-  document.body.style.removeProperty('--morph-show')
+  for (const name of ['--morph-show-from', '--morph-show-to']) document.body.style.removeProperty(name)
   const panel = document.getElementById('panel')
   if (panel) {
     panel.style.height = ''
@@ -1327,13 +1327,18 @@ async function switchView(next, { persist = true } = {}) {
   const gutter = el.stage.clientHeight - panelBox.height
   const showFrom = Math.round(gutter + panelBox.height)
   const showTo = Math.round(gutter + (targetPanel > 0 ? targetPanel : panelBox.height))
-  document.body.style.setProperty('--morph-show', `${showFrom}px`)
+  // Both ends are known before anything moves, which is the point: the reveal is
+  // a CSS animation on .stage (and on the two views), not a transition. A
+  // transition needs its start value committed by an earlier style update, and a
+  // forced reflow does not promise one — on three of the four CI runners the
+  // whole change collapsed into a single style update, so the clip jumped from
+  // one end to the other and the crossfade never appeared, while Linux showed 18
+  // distinct edge positions from the same code.
+  document.body.style.setProperty('--morph-show-from', `${showFrom}px`)
+  document.body.style.setProperty('--morph-show-to', `${showTo}px`)
   // Stack both views, then let the incoming one land while the edge moves.
   // No frame of this ever shows an empty card.
   document.body.classList.add('morphing', `morph-from-${source}`, `morph-to-${target}`)
-  void document.body.offsetWidth
-  document.body.style.setProperty('--morph-show', `${showTo}px`)
-  document.body.classList.add('morph-run')
   let moved = true
   try {
     if (persist) await bridge.setView(target)
@@ -1365,10 +1370,11 @@ function morphDuration() {
   return Number.isFinite(ms) && ms > 0 ? ms : 300
 }
 
-// transitionend is the honest signal that the reveal is over; a throttled page
-// may deliver it hundreds of milliseconds late or, if the transition never fired
-// at all, never. So a timer of the same length plus a grace period races it, and
-// whichever comes first ends the morph.
+// animationend is the honest signal that the reveal is over; a throttled page
+// may deliver it hundreds of milliseconds late or never. So a timer of the same
+// length plus a grace period races it, and whichever comes first ends the morph.
+// The name is checked because the two views animate too, and their ends are not
+// this morph's landing.
 function revealHasLanded() {
   return new Promise((resolve) => {
     const stage = el.stage
@@ -1377,16 +1383,14 @@ function revealHasLanded() {
     const finish = () => {
       if (done) return
       done = true
-      stage?.removeEventListener('transitionend', onEnd)
+      stage?.removeEventListener('animationend', onEnd)
       clearTimeout(timer)
       resolve()
     }
     const onEnd = (event) => {
-      // Only this morph's own edge. The settings sheet slides in on a transform
-      // transition, and its end would otherwise be taken for the reveal landing.
-      if (event.target === stage && event.propertyName === 'clip-path') finish()
+      if (event.target === stage && event.animationName === 'morph-reveal') finish()
     }
-    stage?.addEventListener('transitionend', onEnd)
+    stage?.addEventListener('animationend', onEnd)
     timer = setTimeout(finish, morphDuration() + 250)
   })
 }

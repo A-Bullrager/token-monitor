@@ -3241,14 +3241,19 @@ body.theme-dark .panel::before {
    resize measured 13-20ms per step on Linux and Windows but 150-393ms per step on
    the two macOS runners, where the reveal therefore arrived as one jump. */
 
-/* The moving edge itself. `--morph-show` is the band of stage that stays visible
-   — the card plus its gutter — and it is measured against 100% so the same value
-   means the same thing at any stage size: while the window has not grown yet the
-   inset goes negative and clips nothing, and once it has, the clip hides exactly
-   what the reveal has not uncovered. Values come from switchView(). */
+/* The moving edge itself. `--morph-show-from` / `--morph-show-to` are the bands
+   of stage that stay visible at the two ends — the card plus its gutter — and
+   they are measured against 100% so the same value means the same thing at any
+   stage size: while the window has not grown yet the inset goes negative and
+   clips nothing, and once it has, the clip hides exactly what the reveal has not
+   uncovered. Values come from switchView(). */
+@keyframes morph-reveal {
+  from { clip-path: inset(0 0 calc(100% - var(--morph-show-from, 100%)) 0); }
+  to { clip-path: inset(0 0 calc(100% - var(--morph-show-to, 100%)) 0); }
+}
+
 body.morphing .stage {
-  clip-path: inset(0 0 calc(100% - var(--morph-show, 100%)) 0);
-  transition: clip-path var(--morph-ms, 300ms) var(--morph-ease);
+  animation: morph-reveal var(--morph-ms, 300ms) var(--morph-ease) both;
 }
 
 /* One curve for every channel of the morph — the window tween in main.js, the
@@ -3279,11 +3284,44 @@ body.morphing .deck {
   pointer-events: none;
   transform-origin: 50% 0;
   will-change: opacity, transform;
-  /* Same curve and duration the main process resizes the window with
-     (--morph-ms is pushed from bootstrap; the fallback keeps the showcase page honest). */
-  transition:
-    opacity var(--morph-ms, 300ms) var(--morph-ease),
-    transform var(--morph-ms, 300ms) var(--morph-ease);
+  /* Animations, not transitions, and that is a measured decision. A transition
+     needs its start value to have been committed by an earlier style change;
+     forcing a reflow before setting the end value does not guarantee one, and on
+     three of the four CI runners the change collapsed into a single style
+     update: the crossfade never appeared (best opacity 1.0, i.e. no fade at all)
+     and the reveal arrived as one jump, while Linux — same code, same build —
+     showed 18 distinct edge positions. Keyframes are known the moment the class
+     lands, so there is no start state for the engine to miss. */
+}
+
+/* The incoming view lands and settles to full size; the outgoing one lets go and
+   drifts the other way. A pure crossfade would read as a mis-registered double
+   image; the scale gives it direction. */
+@keyframes view-in {
+  from { opacity: 0; transform: scale(0.972); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes view-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.014); }
+}
+
+body.morphing.morph-to-deck .deck,
+body.morphing.morph-to-strip .strip {
+  z-index: 12;
+  animation: view-in var(--morph-ms, 300ms) var(--morph-ease) both;
+}
+
+body.morphing.morph-to-deck .strip {
+  animation: view-out calc(var(--morph-ms, 300ms) * 0.62) var(--morph-ease) both;
+}
+
+/* Collapsing is the reverse of a reveal, not of a fold: the deck has to keep
+   covering the card while the window contracts onto the strip, so it lets go
+   later than the strip does when the card opens up. */
+body.morphing.morph-to-strip .deck {
+  animation: view-out calc(var(--morph-ms, 300ms) * 0.95) var(--morph-ease) both;
 }
 
 body.morphing.morph-from-strip .strip,
@@ -3302,37 +3340,5 @@ body.morphing .deck-scroll {
 
 body.morphing .deck-scroll::-webkit-scrollbar {
   width: 0;
-}
-
-/* Pre-run: the incoming view waits at opacity 0, on top of the outgoing one. */
-body.morphing.morph-to-deck .deck,
-body.morphing.morph-to-strip .strip {
-  z-index: 12;
-  opacity: 0;
-  transform: scale(0.972);
-}
-
-/* Run: the incoming layout lands and settles to full size, the outgoing one
-   lets go slightly faster and drifts the other way. A pure crossfade would
-   read as a mis-registered double image; the scale gives it direction. */
-body.morphing.morph-run.morph-to-deck .deck,
-body.morphing.morph-run.morph-to-strip .strip {
-  opacity: 1;
-  transform: scale(1);
-}
-
-body.morphing.morph-run.morph-to-deck .strip {
-  opacity: 0;
-  transform: scale(1.014);
-  transition-duration: calc(var(--morph-ms, 300ms) * 0.62);
-}
-
-/* Collapsing is the reverse of a reveal, not of a fold: the deck has to keep
-   covering the card while the window contracts onto the strip, so it lets go
-   later than the strip does when the card opens up. */
-body.morphing.morph-run.morph-to-strip .deck {
-  opacity: 0;
-  transform: scale(1.014);
-  transition-duration: calc(var(--morph-ms, 300ms) * 0.95);
 }
 
