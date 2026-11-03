@@ -421,7 +421,10 @@ try {
   // height settles, and grade what was observed.
   const sampleMorph = async (trigger) => {
     await waitFor('morph idle', `!${viewExpr('morphing')}`)
-    return evaluate(`new Promise((resolve) => {
+    // Where the main process's trace stood before this morph, so the resize
+    // count below is this morph's and not the session's.
+    const stdoutBefore = (session.stdout?.() || '').length
+    const run = await evaluate(`new Promise((resolve) => {
       const samples = []
       const t0 = performance.now()
       const strip = document.getElementById('stripView')
@@ -454,6 +457,15 @@ try {
           panel: height,
           // The inline height the morph pins the card with; empty outside a morph.
           pin: document.getElementById('panel').style.height || '',
+          // The moving edge, which lives in the page now: the visible band of
+          // stage that the clip leaves open. The interpolated number is read out
+          // of the computed clip-path (it animates as calc(100% - Npx)), and the
+          // double backslashes are for this sampler being a template literal.
+          show: (() => {
+            const value = getComputedStyle(document.getElementById('stage')).clipPath
+            const hit = /calc\\(100% - ([\\d.]+)px\\)/.exec(value)
+            return hit ? Math.round(Number(hit[1])) : value === 'none' ? 0 : -1
+          })(),
           // The window edge is what moves now; the card is laid out once and
           // revealed, so the two series say different things and both are needed.
           win: window.innerHeight,
@@ -472,6 +484,7 @@ try {
       requestAnimationFrame(step)
       ${trigger}
     })`)
+    return { ...run, stdoutBefore }
   }
 
   const gradeMorph = (run) => {
@@ -525,6 +538,16 @@ try {
       // t:panel(pin)/window for every frame — the only way to tell a missing
       // pin from a layout clamp from the artifact alone.
       panelSeries: run.samples.map((s) => `${s.t}:${s.panel}${s.pin ? '[' + s.pin + ']' : ''}/${s.win}${s.morphing ? '' : '.'}`),
+      // The edge the reader watches is now the page's clip, so it is what gets
+      // graded: the reveal has to travel the card's own height and arrive in
+      // steps. The window series stays in the report as description — it is the
+      // witness that the mover stopped animating — but a window that travels in
+      // two moves is the correct behaviour now, not a failure.
+      revealFrom: fading.length ? fading[0].show : null,
+      revealTo: fading.length ? fading.at(-1).show : null,
+      revealSteps: new Set(fading.map((s) => s.show)).size,
+      revealTravel: fading.length ? Math.abs(fading.at(-1).show - fading[0].show) : 0,
+      revealSeries: fading.map((s) => `${s.t}:${s.show}/${s.win}`),
       dimmest: Math.min(...frameWindow.map((s) => Math.max(s.so, s.dop))),
       deckHeights: [Math.min(...frameWindow.map((s) => s.deck)), Math.max(...frameWindow.map((s) => s.deck))],
       stripHeights: [Math.min(...frameWindow.map((s) => s.strip)), Math.max(...frameWindow.map((s) => s.strip))],
@@ -535,19 +558,38 @@ try {
       frameGaps: run.samples.slice(1).map((s) => s.gap),
       worstFrameGap: run.samples.length > 1 ? Math.max(...run.samples.slice(1).map((s) => s.gap)) : 0,
       visibility: [...new Set(run.samples.map((s) => s.vis))],
-      focused: run.samples.every((s) => s.has === true)
+      focused: run.samples.every((s) => s.has === true),
+      // Where in the main process's trace this morph started, so the resize
+      // witness below can be attributed to it alone.
+      stdoutBefore: run.stdoutBefore ?? 0
     }
   }
 
   const triggerCollapse = "document.querySelector('.deck-head [data-action=\"collapse\"]').click()"
-  const isAnimated = (grade) => grade.panelDelta > 0 && grade.winIntermediate >= 3 &&
-    Math.abs(grade.winFrom - grade.winTo) >= grade.panelDelta * 0.75
+  // What counts as an animated morph, and a deliberate change of judgement.
+  //
+  // Until now the moving edge was the operating system's window frame, so the
+  // step count of `window.innerHeight` was the honest measure of the reveal. The
+  // edge now lives in the page (the --morph-show clip on .stage) and the window
+  // is resized at most twice per morph, up before the reveal starts and down
+  // after it lands — both invisible, because what is added or removed is
+  // transparent stage. Grading window steps here would grade the absence of the
+  // design, so the reveal is measured on the clip that draws it and the window
+  // series stays in the report as description only.
+  //
+  // The reason for the move is measured, not theoretical: the same 300ms morph
+  // was stamped by the mover itself at 39-44 resizes and 13-20ms per resize on
+  // Linux and Windows, but 9 resizes at 150ms on macOS Intel and 2 resizes at
+  // 393ms on Apple Silicon, where the window-edge reveal therefore arrived as one
+  // jump no matter how good the curve feeding it.
+  const isAnimated = (grade) => grade.panelDelta > 0 && grade.revealSteps >= 3 &&
+    grade.revealTravel >= grade.panelDelta * 0.75
   const attempts = []
   let graded = null
   for (let attempt = 0; attempt < 3; attempt++) {
     const grade = gradeMorph(await sampleMorph(triggerCollapse))
     attempts.push(grade)
-    if (!graded || grade.winIntermediate > graded.winIntermediate) graded = grade
+    if (!graded || grade.revealSteps > graded.revealSteps) graded = grade
     if (isAnimated(grade)) break
     await sleep(400)
   }
@@ -555,91 +597,62 @@ try {
   // Every attempt is kept: a pass that only succeeded on the third try is
   // evidence about the runner, not a hidden retry.
   report.firstLaunch.morphAttempts = attempts.map((grade) => ({
-    frames: grade.frames, fadingFrames: grade.fadingFrames, winIntermediate: grade.winIntermediate, panelChanges: grade.panelChanges,
+    frames: grade.frames, fadingFrames: grade.fadingFrames, revealSteps: grade.revealSteps,
+    revealTravel: grade.revealTravel, panelChanges: grade.panelChanges,
     panelFrom: grade.panelFrom, panelTo: grade.panelTo, panelDelta: grade.panelDelta,
-    sampledUntil: grade.sampledUntil
+    winIntermediate: grade.winIntermediate, sampledUntil: grade.sampledUntil
   }))
-  // The window's side of the same animation, read from the main process's own
-  // trace (TM_MORPH_DEBUG=1, which CI sets for this matrix). `window.innerWidth`
-  // only changes when the renderer processes a resize, so a frozen page and a
-  // frozen mover are indistinguishable in the page samples; these lines are the
-  // mover's testimony.
+  // The window's side, read from the main process's own trace (TM_MORPH_DEBUG=1,
+  // which CI sets for this matrix). Kept because the two witnesses answer
+  // different questions: the page says whether the edge moved, the mover says
+  // whether the stage was resized the number of times the design promises.
   await sleep(300)
-  const windowTicks = (() => {
-    const text = session.stdout?.() || ''
-    const num = (tail, key) => {
-      const hit = new RegExp(`${key}=(\\d+)`).exec(tail)
-      return hit ? Number(hit[1]) : null
-    }
-    const events = [...text.matchAll(/\[morph \+(\d+)ms\] (start|tick|done) (\d+)x(\d+)(.*)$/gm)].map((m) => ({
+  const morphResizes = (() => {
+    const text = (session.stdout?.() || '').slice(graded.stdoutBefore)
+    const events = [...text.matchAll(/\[morph \+(\d+)ms\] resize (grow|shrink|settled-by-timeout)(?: (\d+)x(\d+) -> (\d+)x(\d+))?.*$/gm)].map((m) => ({
       t: Number(m[1]),
-      kind: m[2],
-      w: Number(m[3]),
-      h: Number(m[4]),
-      intended: num(m[5], 'intended'),
-      steps: num(m[5], 'steps'),
-      scheduled: num(m[5], 'scheduled'),
-      duration: num(m[5], 'duration')
+      phase: m[2],
+      from: m[3] ? `${m[3]}x${m[4]}` : null,
+      to: m[5] ? `${m[5]}x${m[6]}` : null
     }))
-    if (!events.length) return { traceEnabled: false, events: [] }
-    // Split into animations at each start. The attempt loop can move the window
-    // more than once, so every animation is summarised and the last one is
-    // detailed: stdout is a stream, so the newest `done` line may not have been
-    // flushed yet, and a partial tail is still the evidence of this morph.
-    const animations = []
-    for (const e of events) {
-      if (e.kind === 'start') animations.push([e])
-      else if (animations.length) animations.at(-1).push(e)
-    }
-    const pair = animations.at(-1) || []
-    const last = pair.at(-1)
-    const moved = pair.filter((e) => e.kind === 'tick')
-    const gaps = pair.slice(1).map((e, i) => e.t - pair[i].t)
-    const drift = moved.filter((e) => e.intended !== null).map((e) => e.t - e.intended)
-    const summarise = (a) => {
-      const ticks = a.filter((e) => e.kind === 'tick')
-      const between = a.slice(1).map((e, i) => e.t - a[i].t)
-      return {
-        from: `${a[0].w}x${a[0].h}`,
-        to: `${a.at(-1).w}x${a.at(-1).h}`,
-        wallSpan: a.at(-1).t - a[0].t,
-        steps: ticks.length,
-        biggestGap: between.length ? Math.max(...between) : 0,
-        maxLateness: Math.max(0, ...ticks.filter((e) => e.intended !== null).map((e) => e.t - e.intended)),
-        endedWithDone: a.at(-1).kind === 'done'
-      }
-    }
     return {
-      traceEnabled: true,
-      // How long the main process says its own animation took, against the
-      // duration it was asked for: 300ms of morph done in 1400ms of wall clock is
-      // starvation on that side, and a page freeze looks different from this.
-      animations: animations.map(summarise),
-      wallSpan: last?.t ?? null,
-      scheduled: last?.scheduled ?? null,
-      duration: last?.duration ?? null,
-      steps: moved.length,
-      endedWithDone: last?.kind === 'done',
-      biggestMainGap: gaps.length ? Math.max(...gaps) : 0,
-      // t - intended, per step: the loop's lateness, which grows when the process
-      // is not being scheduled and stays near zero when it is.
-      maxLateness: drift.length ? Math.max(...drift) : 0,
-      series: pair.map((e) => `${e.t}:${e.kind} ${e.w}x${e.h}${e.intended === null ? '' : ` want ${e.intended}`}`)
+      traceEnabled: events.length > 0,
+      count: events.length,
+      events,
+      // Two is the whole design: one to open the stage, one to close it. A third
+      // means something is resizing the window per frame again.
+      perMorph: attempts.length ? events.length / attempts.length : null,
+      series: events.map((e) => `${e.t}:${e.phase} ${e.from ?? ''}${e.to ? ` -> ${e.to}` : ''}`)
     }
   })()
-  report.firstLaunch.windowTicks = windowTicks
+  report.firstLaunch.morphResizes = morphResizes
   assert.ok(graded.frames >= 3, `morph sampled only ${graded.frames} frames (worst gap ${graded.worstFrameGap}ms, visibility ${JSON.stringify(graded.visibility)})`)
-  assert.ok(graded.panelDelta > 0, `collapse did not shrink the panel: ${graded.restingPanelFrom} -> ${graded.restingPanelTo} (watched ${graded.sampledUntil}ms; mover said ${windowTicks.traceEnabled ? `${windowTicks.steps} steps in ${windowTicks.wallSpan}ms` : 'nothing'})`)
+  assert.ok(graded.panelDelta > 0, `collapse did not shrink the card: ${graded.restingPanelFrom} -> ${graded.restingPanelTo} (watched ${graded.sampledUntil}ms, resizes ${JSON.stringify(morphResizes.series)})`)
   assert.ok(
-    Math.abs(graded.winFrom - graded.winTo) >= graded.panelDelta * 0.75,
-    `window did not travel most of its actual ${graded.panelDelta}px: ${graded.winFrom} -> ${graded.winTo} ` +
+    graded.revealTravel >= graded.panelDelta * 0.75,
+    `the page's edge did not travel the card's own ${graded.panelDelta}px: revealed ${graded.revealFrom} -> ${graded.revealTo} ` +
     `(after ${attempts.length} attempt(s): ${JSON.stringify(report.firstLaunch.morphAttempts)})`
   )
   assert.ok(
-    graded.winIntermediate >= 3,
-    `the reveal must arrive in steps, not one jump (intermediate window sizes ${graded.winIntermediate}, biggest step ${graded.biggestStep}px of ${graded.panelDelta}px; ` +
-    `page saw ${graded.frames} frames with a worst gap of ${graded.worstFrameGap}ms while ${windowTicks.traceEnabled ? `the mover ran ${windowTicks.steps} steps in ${windowTicks.wallSpan}ms (max lateness ${windowTicks.maxLateness}ms)` : 'no mover trace (TM_MORPH_DEBUG off)'}, visibility ${JSON.stringify(graded.visibility)}, focused ${graded.focused})`
+    graded.revealSteps >= 3,
+    `the reveal must arrive in steps, not one jump (${graded.revealSteps} distinct edge positions over ${graded.fadingFrames} morphing frames, ` +
+    `worst frame gap ${graded.worstFrameGap}ms, visibility ${JSON.stringify(graded.visibility)}, focused ${graded.focused}, window saw ${graded.winIntermediate} intermediate sizes) — ${JSON.stringify(graded.revealSeries)}`
   )
+  assert.ok(
+    !morphResizes.traceEnabled || morphResizes.count <= 2 * attempts.length,
+    `a morph may resize the window at most twice (open the stage, close it); ${morphResizes.count} resizes over ${attempts.length} attempt(s) — ${JSON.stringify(morphResizes.series)}`
+  )
+  // The two witnesses have to agree: if the page saw the window come down onto
+  // the card, the main process must have said it resized it down. A reveal that
+  // left the stage big would show up here rather than as a card clipped inside a
+  // window that is still the size of the other form.
+  if (morphResizes.traceEnabled && graded.winTo < graded.winFrom - 1) {
+    const shrunk = morphResizes.events.some((e) => e.phase === 'shrink' && e.to && Number(e.to.split('x')[1]) <= graded.winTo + 1)
+    assert.ok(
+      shrunk,
+      `the window came down to ${graded.winTo} in the page but the mover never reported a shrink to it — ${JSON.stringify(morphResizes.series)}`
+    )
+  }
   // The card is laid out once at the larger height and revealed by the moving
   // edge. A panel that resizes per frame is the 60-100ms content trail this
   // architecture exists to prevent, so it is graded, not just described.

@@ -1278,6 +1278,7 @@ const MORPH_CLASSES = ['morphing', 'morph-run', 'morph-to-deck', 'morph-to-strip
 
 function clearMorphClasses() {
   document.body.classList.remove(...MORPH_CLASSES)
+  document.body.style.removeProperty('--morph-show')
   const panel = document.getElementById('panel')
   if (panel) {
     panel.style.height = ''
@@ -1299,28 +1300,39 @@ async function switchView(next, { persist = true } = {}) {
   const targetPanel = state.formHeights?.[target] ? Math.round(state.formHeights[target] - chrome) : 0
   document.body.style.setProperty('--morph-out-h', `${Math.round(outgoing.getBoundingClientRect().height)}px`)
   document.body.style.setProperty('--morph-in-h', targetPanel > 0 ? `${targetPanel}px` : '100%')
-  // The card is laid out once, at the larger of the two heights, and the window
-  // then only *reveals* it. Measured before changing this: with the panel at
-  // height:100% every one of the ~70 window steps re-laid-out the whole card,
-  // and the content ran 60-100ms behind the frame edge (one resize of this
-  // window takes that long to reach the page). Pinning the height means the
-  // moving edge clips a card that is already final, so there is nothing to lag.
-  //
-  // Both height and min-height, because CI caught one frame where a definite
-  // inline height was still laid out as 100% of the shrinking stage (640 -> 613
-  // -> 640 while the window did not change in between). Two things that were
-  // ruled out on the way there: a custom property read via var() (it resolved to
-  // its fallback) and the inline height arriving late (the value was on the
-  // element on every frame, that one included). A minimum cannot be resolved
-  // downwards that way, so the strict "laid out once" assertion stands.
-  // Cleared in clearMorphClasses.
+  // The card is laid out once, at the larger of the two heights, and the moving
+  // edge only reveals it. Measured before this was the design: with the panel at
+  // height:100% every one of the ~70 window steps re-laid-out the whole card, and
+  // the content ran 60-100ms behind the frame edge. A pinned card has nothing to
+  // lag. Both height and min-height, because CI once caught a definite inline
+  // height being laid out as 100% of a shrinking stage; a minimum cannot resolve
+  // downwards that way. Cleared in clearMorphClasses.
+  const panelEl = document.getElementById('panel')
   const pin = `${Math.max(Math.round(panelBox.height), targetPanel)}px`
-  document.getElementById('panel').style.height = pin
-  document.getElementById('panel').style.minHeight = pin
-  // Stack both views, then let the incoming one land while the window moves.
+  panelEl.style.height = pin
+  panelEl.style.minHeight = pin
+  // The moving edge, now in the page. `--morph-show` is the band of stage that
+  // stays visible: the card plus the gutter around it (36px of padding on either
+  // side, where the shadow lives). It is expressed against 100% rather than as a
+  // hidden amount so that it means the same thing whatever the stage currently
+  // is: while the window is still the small one the clip hides nothing and the
+  // window edge does the work, and once the stage has grown the clip hides
+  // exactly what the reveal has not uncovered yet.
+  //
+  // The window itself moves at most twice per morph — up before this starts, down
+  // after it lands — and neither move can be seen, because what is added or
+  // taken is transparent stage. That replaced a per-frame resize, which measured
+  // as 13-20ms per step on Linux and Windows but 150-393ms per step on the two
+  // macOS runners: on those the reveal was one jump, however good the curve.
+  const gutter = el.stage.clientHeight - panelBox.height
+  const showFrom = Math.round(gutter + panelBox.height)
+  const showTo = Math.round(gutter + (targetPanel > 0 ? targetPanel : panelBox.height))
+  document.body.style.setProperty('--morph-show', `${showFrom}px`)
+  // Stack both views, then let the incoming one land while the edge moves.
   // No frame of this ever shows an empty card.
   document.body.classList.add('morphing', `morph-from-${source}`, `morph-to-${target}`)
   void document.body.offsetWidth
+  document.body.style.setProperty('--morph-show', `${showTo}px`)
   document.body.classList.add('morph-run')
   let moved = true
   try {
@@ -1331,11 +1343,80 @@ async function switchView(next, { persist = true } = {}) {
   }
   // If the window refused to move, stay on the view that actually fits it.
   setBodyView(moved ? target : source)
+  // Let the reveal land, then take the stage back down onto the card (a no-op
+  // when the card opened into a stage that was already big enough). The pin comes
+  // off only once that resize has reached the page, because the card is allowed
+  // back to height:100% only when 100% is the size it was revealed at.
+  await revealHasLanded()
+  const shrunk = moved ? await bridge.settleView().catch(() => null) : null
+  if (shrunk) await stageHasResized(shrunk.height)
   // One frame with the final layout in place before the stack is taken apart.
   await new Promise(requestAnimationFrame)
   await new Promise(requestAnimationFrame)
   clearMorphClasses()
   state.switching = false
+}
+
+// The renderer's own morph length, as pushed by the main process. The CSS
+// transition and this waiting page have to agree on one number.
+function morphDuration() {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--morph-ms').trim()
+  const ms = Number.parseInt(raw, 10)
+  return Number.isFinite(ms) && ms > 0 ? ms : 300
+}
+
+// transitionend is the honest signal that the reveal is over; a throttled page
+// may deliver it hundreds of milliseconds late or, if the transition never fired
+// at all, never. So a timer of the same length plus a grace period races it, and
+// whichever comes first ends the morph.
+function revealHasLanded() {
+  return new Promise((resolve) => {
+    const stage = el.stage
+    let done = false
+    let timer = null
+    const finish = () => {
+      if (done) return
+      done = true
+      stage?.removeEventListener('transitionend', onEnd)
+      clearTimeout(timer)
+      resolve()
+    }
+    const onEnd = (event) => {
+      // Only this morph's own edge. The settings sheet slides in on a transform
+      // transition, and its end would otherwise be taken for the reveal landing.
+      if (event.target === stage && event.propertyName === 'clip-path') finish()
+    }
+    stage?.addEventListener('transitionend', onEnd)
+    timer = setTimeout(finish, morphDuration() + 250)
+  })
+}
+
+// Wait for the settle resize to reach the page: the card may go back to
+// height:100% only once 100% is the size it was just revealed at. Bounded,
+// because a window that never answers must not keep the morph classes on
+// forever — the fallback then shows a stretched card for a moment, which is the
+// lesser evil compared with a card that stays clipped and pinned forever.
+// macOS is the reason this is not assumed instant: one setBounds measured
+// 150-393ms of round trip there, against 13-20ms on Linux and Windows.
+function stageHasResized(expectedOuter, timeout = 1500) {
+  return new Promise((resolve) => {
+    const alreadySmallEnough = window.innerHeight <= expectedOuter + 2
+    let settled = false
+    let timer = null
+    const finish = () => {
+      if (settled) return
+      settled = true
+      window.removeEventListener('resize', onResize)
+      clearTimeout(timer)
+      resolve()
+    }
+    const onResize = () => {
+      if (window.innerHeight <= expectedOuter + 2) finish()
+    }
+    if (alreadySmallEnough) return finish()
+    window.addEventListener('resize', onResize)
+    timer = setTimeout(finish, timeout)
+  })
 }
 
 /* ── settings ─────────────────────────────────────────────── */

@@ -51,6 +51,15 @@ const SAMPLER = `
         h: window.innerHeight,
         ph: Math.round(document.getElementById('panel').getBoundingClientRect().height),
         pb: Math.round(document.getElementById('panel').getBoundingClientRect().bottom),
+        // The bottom inset the page's own clip is at, in px. This is the moving
+        // edge now; the window is only resized twice per morph.
+        clip: (() => {
+          const value = getComputedStyle(document.getElementById('stage')).clipPath
+          // Double backslashes: this sampler is a template literal, and the
+          // escapes it carries have to survive into the page's own source.
+          const hit = /inset\\(0px 0px ([\\d.]+)px/.exec(value)
+          return hit ? Math.round(Number(hit[1])) : value
+        })(),
         sh: Math.round(strip.getBoundingClientRect().height),
         sf: Math.round(strip.querySelector('.strip-foot').getBoundingClientRect().bottom),
         df: Math.round(deck.querySelector('.deck-foot').getBoundingClientRect().bottom),
@@ -158,7 +167,7 @@ try {
     console.log(
       samples
         .filter((_, i) => i % 3 === 0)
-        .map((s) => `t${String(s.t).padStart(4)} win=${s.w}x${s.h} panel=${s.ph} strip=${s.sh}[${s.sdisp} kids=${s.kids} main=${s.mh}](foot@${s.sf}) deck=${s.dh}(foot@${s.df}) op=${s.so.toFixed(2)}/${s.dop.toFixed(2)}`)
+        .map((s) => `t${String(s.t).padStart(4)} win=${s.w}x${s.h} panel=${s.ph} clip=${s.clip} strip=${s.sh}[${s.sdisp} kids=${s.kids} main=${s.mh}](foot@${s.sf}) deck=${s.dh}(foot@${s.df}) op=${s.so.toFixed(2)}/${s.dop.toFixed(2)}`)
         .join('\n')
     )
   }

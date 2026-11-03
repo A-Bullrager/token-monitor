@@ -144,121 +144,99 @@ function applyAlwaysOnTop(enabled) {
   mainWindow.setAlwaysOnTop(Boolean(enabled), 'floating')
 }
 
-let boundsTimer = null
-let boundsResolve = null
-
-// cubic-bezier(0.4, 0, 0.2, 1): the platform standard curve. A 684px unfold
-// on a hard ease-out pops; this one gets moving immediately and settles.
-function cubicBezier(p1x, p1y, p2x, p2y) {
-  const cx = 3 * p1x
-  const bx = 3 * (p2x - p1x) - cx
-  const ax = 1 - cx - bx
-  const cy = 3 * p1y
-  const by = 3 * (p2y - p1y) - cy
-  const ay = 1 - cy - by
-  const sampleX = (t) => ((ax * t + bx) * t + cx) * t
-  const sampleY = (t) => ((ay * t + by) * t + cy) * t
-  const slopeX = (t) => (3 * ax * t + 2 * bx) * t + cx
-  return (x) => {
-    let t = x
-    for (let i = 0; i < 6; i += 1) {
-      const dx = sampleX(t) - x
-      if (Math.abs(dx) < 1e-5) break
-      const slope = slopeX(t)
-      if (Math.abs(slope) < 1e-6) break
-      t -= dx / slope
-    }
-    return sampleY(Math.min(1, Math.max(0, t)))
-  }
-}
-
-// Ease-out, not the Material ease-in-out this used to be: that curve barely
-// moved for its first ~100ms, which reads as hesitation before the card has
-// started to open. The renderer's transitions carry the same curve as
-// --morph-ease in styles.css; a CSS variable cannot be read from here, so the
-// literal is duplicated and both copies say so.
-const MORPH_EASE = cubicBezier(0.3, 0.7, 0.3, 1)
-// Single source of truth: the renderer reads this from bootstrap and drives
-// its crossfade with the same number. TM_MORPH_MS exists for slow-motion
-// frame capture (node scripts/morph-cast.mjs).
+// ── the view morph: two resizes, no tween ────────────────────────────────
+// Single source of truth for the morph length: the renderer reads this from
+// bootstrap and drives its own reveal with the same number. TM_MORPH_MS exists
+// for slow-motion frame capture (node scripts/morph-cast.mjs).
 const MORPH_MS = Number(process.env.TM_MORPH_MS) || 300
-// TM_MORPH_DEBUG=1 prints every resize tick: node scripts/morph-cast.mjs uses
-// it to tell "the window never moved" apart from "the window moved too slowly".
+// TM_MORPH_DEBUG=1 prints every window resize a morph makes. CI sets it and the
+// UI check reads those lines back, because the page cannot tell "the mover never
+// moved" apart from "the renderer was frozen": window.innerWidth only updates
+// when a throttled page gets to process a resize.
 const MORPH_TRACE = process.env.TM_MORPH_DEBUG === '1'
-// The tween's clock, measured rather than assumed. `setInterval(fn, 1000/60)` in
-// Electron's main process does not wake at 60Hz: with a blank page *and* with a
-// heavy one it woke every ~30ms, so a 300ms morph got 10 window updates of
-// wildly different size (0, 16, 74, 192, 132, 108, 66, 40, 24, 12, 4 pixels).
-// A self-rescheduling `setTimeout` achieved ~10ms. The OS was never the problem
-// — one `setBounds` costs 1–5ms — but the window edge is the largest visual
-// change in this animation, and a 30Hz clock on it is exactly what reads as
-// stutter. 6ms plus the loop's own work lands near one display frame without
-// spending main-process time on sizes that round to the same rectangle.
-const MORPH_FRAME_MS = Number(process.env.TM_MORPH_FRAME) || 6
 
-function animateWindowBounds(target, duration = MORPH_MS) {
-  return new Promise((resolve) => {
-    if (!mainWindow) return resolve()
-    if (boundsTimer) {
-      clearTimeout(boundsTimer)
-      boundsTimer = null
-      boundsResolve?.()
-      boundsResolve = null
-    }
-    const start = mainWindow.getBounds()
-    const startedAt = performance.now()
-    if (MORPH_TRACE) console.log(`[morph +0ms] start ${start.width}x${start.height} -> ${target.width}x${target.height}`)
-    boundsResolve = resolve
-    let applied = { ...start }
-    let ticks = 0
-    const stop = () => {
-      boundsTimer = null
-      boundsResolve = null
-    }
-    const tick = () => {
-      if (!mainWindow) {
-        stop()
-        resolve()
-        return
-      }
-      const progress = Math.min(1, (performance.now() - startedAt) / duration)
-      const eased = MORPH_EASE(progress)
-      const bounds = {
-        x: Math.round(start.x + (target.x - start.x) * eased),
-        y: Math.round(start.y + (target.y - start.y) * eased),
-        width: Math.round(start.width + (target.width - start.width) * eased),
-        height: Math.round(start.height + (target.height - start.height) * eased)
-      }
-      // A redundant SetWindowPos costs the same as one that matters, and at this
-      // cadence the easing rounds to the same rectangle for two ticks in a row.
-      if (bounds.width !== applied.width || bounds.height !== applied.height ||
-          bounds.x !== applied.x || bounds.y !== applied.y) {
-        mainWindow.setBounds(bounds)
-        applied = bounds
-        ticks++
-        // The wall stamp, not the intended one: "the loop was scheduled 50 times
-        // and the OS applied every size" and "the loop only woke 6 times" look the
-        // same in progress terms, and only the elapsed column tells them apart.
-        if (MORPH_TRACE)
-          console.log(
-            `[morph +${Math.round(performance.now() - startedAt)}ms] tick ${bounds.width}x${bounds.height} intended=${Math.round(progress * duration)}ms steps=${ticks}`
-          )
-      }
-      if (progress >= 1) {
-        stop()
-        mainWindow.setBounds(target)
-        if (MORPH_TRACE)
-          console.log(
-            `[morph +${Math.round(performance.now() - startedAt)}ms] done ${target.width}x${target.height} steps=${ticks} scheduled=${MORPH_FRAME_MS}ms duration=${duration}ms`
-          )
-        resolve()
-        return
-      }
-      boundsTimer = setTimeout(tick, MORPH_FRAME_MS)
-    }
-    tick()
-  })
+// The moving edge lives in the page now (the --morph-show clip on .stage), and
+// the window is resized at most twice per morph — both of them invisible by
+// construction:
+//
+//   grow early — before the card starts to open, the window takes the union of
+//     the two boxes. Everything the union adds is transparent stage, so nothing
+//     on screen moves, and the card is never asked to re-flow.
+//   shrink late — after the card has finished closing, the window takes the
+//     smaller box again. Everything removed is stage the card has already let go
+//     of, so this resize cannot be seen either.
+//
+// The measured reason for giving up the tween: per-frame setBounds is the
+// expensive call, and it is expensive very unevenly across platforms. Five CI
+// rounds with the mover self-reporting stamped one 300ms morph at 39-44 steps
+// and 13-20ms per step on Linux and Windows, but 9 steps with a 150ms step on
+// macOS Intel and 2 steps with a 393ms step on Apple Silicon. There the tween's
+// clock is not the limit — the round trip through the window server is — and a
+// window-edge animation on that platform is one jump, however smooth the curve
+// feeding it. Two calls cannot stutter for that reason, and the compositor
+// carries the motion instead.
+let morphPending = null
+let morphSettleTimer = null
+
+function unionOfBounds(a, b) {
+  const left = Math.min(a.x, b.x)
+  const top = Math.min(a.y, b.y)
+  const right = Math.max(a.x + a.width, b.x + b.width)
+  const bottom = Math.max(a.y + a.height, b.y + b.height)
+  return { x: left, y: top, width: right - left, height: bottom - top }
 }
+
+function sameBounds(a, b) {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+}
+
+// The stamp is the wall clock, not an intended one: what the report has to show
+// is when the operating system was actually asked, against the page's own
+// timeline.
+function applyMorphResize(phase, from, to) {
+  if (!mainWindow || sameBounds(from, to)) return false
+  mainWindow.setBounds(to)
+  if (MORPH_TRACE)
+    console.log(`[morph +${Math.round(performance.now())}ms] resize ${phase} ${from.width}x${from.height} -> ${to.width}x${to.height}`)
+  return true
+}
+
+// Start of a morph: work out the box the finished card will live in and open the
+// stage up to it if that is the larger one. The renderer measures its reveal
+// against the returned stage height, so it never has to guess what the operating
+// system is about to do.
+function morphBegin(view) {
+  if (!mainWindow) return null
+  const previous = mainWindow.getBounds()
+  const target = resizeBoundsForView(view, previous)
+  const stage = unionOfBounds(previous, target)
+  applyMorphResize('grow', previous, stage)
+  morphPending = target
+  // A morph the renderer never settles (its window went away mid-animation, its
+  // process was killed) must not leave a stage bigger than the card on screen.
+  // One bounded, logged fallback, timed well past the reveal.
+  clearTimeout(morphSettleTimer)
+  morphSettleTimer = setTimeout(() => {
+    if (!morphPending) return
+    if (MORPH_TRACE) console.log(`[morph +${Math.round(performance.now())}ms] resize settled-by-timeout`)
+    morphSettle()
+  }, MORPH_MS + 2000)
+  return { stage: mainWindow.getBounds(), target }
+}
+
+// End of a morph: take away the stage the card no longer uses. Safe to call
+// twice, and for a morph that never shrank it does nothing at all.
+function morphSettle() {
+  if (!mainWindow || !morphPending) return null
+  clearTimeout(morphSettleTimer)
+  morphSettleTimer = null
+  const previous = mainWindow.getBounds()
+  const target = morphPending
+  morphPending = null
+  applyMorphResize('shrink', previous, target)
+  return target
+}
+
 
 function trayImage() {
   // macOS draws the menu bar icon from a monochrome template so it follows the
@@ -672,13 +650,21 @@ function registerIpc() {
       mainWindow.webContents.send('view:changed', view)
       return { view }
     }
-    const previous = mainWindow.getBounds()
-    const bounds = resizeBoundsForView(view, previous)
     await store.save({ view })
     currentView = view
-    await animateWindowBounds(bounds)
-    mainWindow?.webContents.send('view:changed', view)
-    return { view, bounds }
+    // The reveal is the renderer's; this side only opens the stage, once.
+    const plan = morphBegin(view)
+    return { view, bounds: plan?.target ?? null, stage: plan?.stage ?? null }
+  })
+
+  // The renderer calls this when its reveal has landed, so the stage can come
+  // back down onto the card. Nothing visible happens here — that is the point.
+  ipcMain.handle('window:morph-settle', async (event) => {
+    if (!trusted(event)) throw new Error(t('不受信任的请求'))
+    if (showcase || !morphPending) return null
+    const bounds = morphSettle()
+    mainWindow?.webContents.send('view:changed', currentView)
+    return bounds
   })
 
   ipcMain.handle('window:pin', async (event, pinned) => {

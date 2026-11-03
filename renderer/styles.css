@@ -3178,10 +3178,26 @@ body.theme-dark .panel::before {
 }
 
 /* ── view morph ─────────────────────────────────────────────
-   Strip and deck are painted on top of each other while the window
-   animates its bounds, so the card is never an empty white box. Each view
-   holds its own resting layout; the moving bottom edge of the card is what
-   reveals the incoming one and clips the outgoing one away. */
+   Strip and deck are painted on top of each other while the card's own bottom
+   edge moves, so the card is never an empty white box. Each view holds its own
+   resting layout; the clipped bottom of the stage is what reveals the incoming
+   one and hides the outgoing one away.
+
+   The edge is a clip in the page, not the window frame: the window is resized at
+   most twice per morph (up before this starts, down after it lands), and both of
+   those moves only ever add or remove transparent stage. A per-frame window
+   resize measured 13-20ms per step on Linux and Windows but 150-393ms per step on
+   the two macOS runners, where the reveal therefore arrived as one jump. */
+
+/* The moving edge itself. `--morph-show` is the band of stage that stays visible
+   — the card plus its gutter — and it is measured against 100% so the same value
+   means the same thing at any stage size: while the window has not grown yet the
+   inset goes negative and clips nothing, and once it has, the clip hides exactly
+   what the reveal has not uncovered. Values come from switchView(). */
+body.morphing .stage {
+  clip-path: inset(0 0 calc(100% - var(--morph-show, 100%)) 0);
+  transition: clip-path var(--morph-ms, 300ms) var(--morph-ease);
+}
 
 /* One curve for every channel of the morph — the window tween in main.js, the
    opacities and the scales here. Ease-out, not the old Material ease-in-out:

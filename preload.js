@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('tm', {
   testConnection: (payload) => ipcRenderer.invoke('config:test', payload),
   clearCredentials: () => ipcRenderer.invoke('config:clear'),
   setView: (view) => ipcRenderer.invoke('window:set-view', view),
+  // Tells the main process the reveal has landed, so the window can come down
+  // onto the card. One call per morph, on purpose: the moving edge is the
+  // renderer's, and resizing the window per frame is what this replaces.
+  settleView: () => ipcRenderer.invoke('window:morph-settle'),
   setPinned: (pinned) => ipcRenderer.invoke('window:pin', pinned),
   applyTheme: (theme) => ipcRenderer.invoke('theme:apply', theme),
   minimize: () => ipcRenderer.send('window:minimize'),
