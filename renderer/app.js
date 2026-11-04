@@ -30,11 +30,18 @@ function applyLanguage(root) {
 // — whichever pass happened to be last decided the look.
 function refitNumbers() {
   for (const [node, options] of fittedNodes) {
-    if (node.isConnected) fitNumber(node, options)
-    else {
+    if (!node.isConnected) {
       fittedNodes.delete(node)
       fittedBase.delete(node)
+      fitText.delete(node)
+      continue
     }
+    // A new figure gets a fresh ladder; an unchanged figure is only re-checked,
+    // because changing its text is what creates a new fitting problem. The
+    // per-frame ladder is started by fitNumber; the watch only has to catch a
+    // metric that moved without a render.
+    if (fitText.get(node) !== node.textContent) fitNumber(node, options)
+    else verifyNumber(node, options)
   }
 }
 
@@ -339,6 +346,102 @@ function traceFit(entry) {
   if (fitTrace.length > 120) fitTrace.splice(0, fitTrace.length - 120)
 }
 
+// The text last fitted per slot, and the ladder's pending frame. A figure that
+// has not changed is only re-checked; a figure that has, gets a new ladder.
+const fitText = new Map()
+const fitChains = new Map()
+
+function baseSize(node) {
+  let base = fittedBase.get(node)
+  if (base === undefined) {
+    node.style.fontSize = ''
+    base = parseFloat(getComputedStyle(node).fontSize)
+    if (!Number.isFinite(base)) return null
+    fittedBase.set(node, base)
+  }
+  return base
+}
+
+function trace(node, base, size, measured, verdict) {
+  if (!node.id) return
+  const rect = node.getBoundingClientRect()
+  traceFit({
+    at: Math.round(performance.now()),
+    id: node.id,
+    base,
+    size,
+    measured,
+    floorPx: +(base * (fittedNodes.get(node)?.floor ?? 0.7)).toFixed(2),
+    inline: node.style.fontSize,
+    client: node.clientWidth,
+    scroll: node.scrollWidth,
+    escaped: verdict ? verdict.escaped : null,
+    wall: verdict ? verdict.wall : null,
+    ink: verdict ? verdict.ink : null,
+    rect: [Math.round(rect.left), Math.round(rect.right), Math.round(rect.top), Math.round(rect.bottom)],
+    view: document.body.classList.contains('view-deck') ? 'deck' : 'strip',
+    inner: [window.innerWidth, window.innerHeight]
+  })
+}
+
+// One ladder step per rendered frame. The layout a browser measures is committed
+// at the frame boundary, and on CI that boundary is real: a font-size written
+// and re-measured in the same task still reports the previous text's size. A
+// loop that trusted its own post-write measurements walked a fit that should
+// stop at 12.16px down to the 11.2px floor, and on one fixture it measured the
+// previous figure's box and concluded the new one fitted. Deciding once per
+// frame means every step is taken against the size the browser has actually laid
+// out, while the ladder, the rule and the floor stay exactly what they were.
+function fitStep(node, left) {
+  const options = fittedNodes.get(node)
+  if (!options || !node.isConnected) return
+  // The form may have been hidden between two steps of the ladder. Stop where
+  // it is rather than reading "no boxes" as "fits" and erasing a good fit.
+  if (!node.clientWidth && !node.getClientRects().length) return
+  const base = baseSize(node)
+  if (!base) return
+  const floorPx = +(base * options.floor).toFixed(2)
+  const stepPx = +(base * 0.12).toFixed(2)
+  const measured = parseFloat(node.style.fontSize) || base
+  const verdict = TmTextFit.escape(node)
+  if (!verdict.escaped) {
+    // A number that fits keeps the stylesheet's look: the inline override is
+    // only the shrink, never a copy of the designed size.
+    if (measured === base && node.style.fontSize) node.style.fontSize = ''
+    trace(node, base, measured, measured, verdict)
+    return
+  }
+  if (left <= 0 || measured <= floorPx) {
+    trace(node, base, measured, measured, verdict)
+    return
+  }
+  const next = Math.max(floorPx, +(measured - stepPx).toFixed(2))
+  node.style.fontSize = `${next}px`
+  trace(node, base, next, measured, verdict)
+  scheduleFit(node, left - 1)
+}
+
+function scheduleFit(node, left) {
+  if (fitChains.has(node)) return
+  const chain = { frame: 0, timer: 0, done: false }
+  fitChains.set(node, chain)
+  const run = () => {
+    if (chain.done) return
+    chain.done = true
+    cancelAnimationFrame(chain.frame)
+    clearTimeout(chain.timer)
+    fitChains.delete(node)
+    fitStep(node, left)
+  }
+  chain.frame = requestAnimationFrame(run)
+  // If the page is not painting, rAF may not run for a long time; a timer keeps
+  // the ladder moving. It is the fallback, not the primary clock.
+  chain.timer = setTimeout(run, 120)
+}
+
+// Called when a figure is rendered. The first frame shows the slot's designed
+// size; the ladder starts on the next frame, when the new text has been laid
+// out.
 function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   if (!node) return
   fittedNodes.set(node, { floor, steps })
@@ -347,57 +450,28 @@ function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   // fit a visible pass already made, which is one way a correct card becomes an
   // overflowing one without anything re-rendering.
   if (!node.clientWidth && !node.getClientRects().length) return // hidden form
-  let base = fittedBase.get(node)
-  if (base === undefined) {
-    node.style.fontSize = ''
-    base = parseFloat(getComputedStyle(node).fontSize)
-    if (!Number.isFinite(base)) return
-    fittedBase.set(node, base)
-  }
-  // If the last pass shrank this slot, put it back to the designed size before
-  // measuring — explicitly, because the size this pass measures against has to
-  // be its own decision rather than whatever a deferred style update left
-  // behind. When nothing was shrunk there is no inline style at all, and the
-  // steady state stays write-free.
-  if (node.style.fontSize) node.style.fontSize = `${base}px`
-  const floorPx = +(base * floor).toFixed(2)
-  const stepPx = +(base * 0.12).toFixed(2)
-  // One rule, in renderer/text-fit.js, shared with the number check and the
-  // language check: the ink has to stay inside the wall it could hit — the nearest
-  // ancestor allowed to clip, or the first element beginning to the right on the
-  // same line. When each party kept its own copy they drifted apart, and the card
-  // spent six CI rounds shrinking numbers the reader could already see in full.
-  let size = base
-  let verdict = TmTextFit.escape(node)
-  for (let step = 0; step < steps && verdict.escaped && size > floorPx; step++) {
-    size = Math.max(floorPx, +(size - stepPx).toFixed(2))
-    node.style.fontSize = `${size}px`
-    // Measured at the size just written, so the trace describes the number the
-    // reader would actually see, not the one before it.
-    verdict = TmTextFit.escape(node)
-  }
-  // A number that fits keeps the stylesheet's look: the inline override is only
-  // the shrink, never a copy of the designed size.
-  if (size === base) node.style.fontSize = ''
-  if (node.id) {
-    const rect = node.getBoundingClientRect()
-    traceFit({
-      at: Math.round(performance.now()),
-      id: node.id,
-      base,
-      size,
-      floorPx,
-      inline: node.style.fontSize,
-      client: node.clientWidth,
-      scroll: node.scrollWidth,
-      escaped: verdict ? verdict.escaped : null,
-      wall: verdict ? verdict.wall : null,
-      ink: verdict ? verdict.ink : null,
-      rect: [Math.round(rect.left), Math.round(rect.right), Math.round(rect.top), Math.round(rect.bottom)],
-      view: document.body.classList.contains('view-deck') ? 'deck' : 'strip',
-      inner: [window.innerWidth, window.innerHeight]
-    })
-  }
+  const text = node.textContent
+  if (fitText.get(node) === text) return
+  fitText.set(node, text)
+  // The designed size for the first frame. The ladder will decide the rest
+  // against what the browser laid out, not against the unshrunk measurement.
+  if (node.style.fontSize) node.style.fontSize = ''
+  scheduleFit(node, steps)
+}
+
+// The standing watch's question: the figure has not changed, but did its
+// metrics? A late font or a letter-spacing change moves the text without a
+// render, and only an escape needs a ladder from where the slot already is.
+function verifyNumber(node, options) {
+  if (fitChains.has(node)) return
+  const base = baseSize(node)
+  if (!base) return
+  const floorPx = +(base * options.floor).toFixed(2)
+  const measured = parseFloat(node.style.fontSize) || base
+  if (measured <= floorPx) return
+  if (!TmTextFit.escape(node).escaped) return
+  fitText.set(node, node.textContent)
+  scheduleFit(node, options.steps)
 }
 
 // A measurement is only valid against the metrics on screen, and the box can be
