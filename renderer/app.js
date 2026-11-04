@@ -31,7 +31,10 @@ function applyLanguage(root) {
 function refitNumbers() {
   for (const [node, options] of fittedNodes) {
     if (node.isConnected) fitNumber(node, options)
-    else fittedNodes.delete(node)
+    else {
+      fittedNodes.delete(node)
+      fittedBase.delete(node)
+    }
   }
 }
 
@@ -317,6 +320,25 @@ function setRunwayType(node, value, base, compact = false) {
 // change to their text re-fits them the same way.
 const fittedNodes = new Map()
 
+// The size each slot was designed at, remembered once. Reading the base back
+// after clearing the inline was the last source of compounding, and CI showed
+// it clearly: the eleven-figure fixture ended at 7.84px — 0.7 of a previous
+// 0.7 of 16 — on Windows and macOS alike, although every local run had 11.2.
+// A slot's designed size is a fact about the stylesheet, so it is read once,
+// from a clean element, and the floor is then an absolute pixel value.
+const fittedBase = new Map()
+
+// A bounded record of the last fitting decisions. The number check copies it
+// into its report when a reading is wrong, so a failure on a platform nobody
+// has in the room arrives with the fitter's own view of the box it measured.
+// A ring of 120 entries: a visible card fits a handful of slots per render and
+// once a second otherwise, so this is a few minutes of history and no growth.
+const fitTrace = []
+function traceFit(entry) {
+  fitTrace.push(entry)
+  if (fitTrace.length > 120) fitTrace.splice(0, fitTrace.length - 120)
+}
+
 function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   if (!node) return
   fittedNodes.set(node, { floor, steps })
@@ -325,23 +347,56 @@ function fitNumber(node, { floor = 0.7, steps = 4 } = {}) {
   // fit a visible pass already made, which is one way a correct card becomes an
   // overflowing one without anything re-rendering.
   if (!node.clientWidth && !node.getClientRects().length) return // hidden form
-  // Start from the stylesheet's size, or each pass would measure the last one's
-  // shrink and compound: 16px became 5.6px became 3.9px for a number that never
-  // needed shrinking at all.
-  node.style.fontSize = ''
-  const base = parseFloat(getComputedStyle(node).fontSize)
-  if (!Number.isFinite(base)) return
+  let base = fittedBase.get(node)
+  if (base === undefined) {
+    node.style.fontSize = ''
+    base = parseFloat(getComputedStyle(node).fontSize)
+    if (!Number.isFinite(base)) return
+    fittedBase.set(node, base)
+  }
+  // If the last pass shrank this slot, put it back to the designed size before
+  // measuring — explicitly, because the size this pass measures against has to
+  // be its own decision rather than whatever a deferred style update left
+  // behind. When nothing was shrunk there is no inline style at all, and the
+  // steady state stays write-free.
+  if (node.style.fontSize) node.style.fontSize = `${base}px`
+  const floorPx = +(base * floor).toFixed(2)
+  const stepPx = +(base * 0.12).toFixed(2)
   // One rule, in renderer/text-fit.js, shared with the number check and the
   // language check: the ink has to stay inside the wall it could hit — the nearest
   // ancestor allowed to clip, or the first element beginning to the right on the
   // same line. When each party kept its own copy they drifted apart, and the card
   // spent six CI rounds shrinking numbers the reader could already see in full.
-  const escaped = () => TmTextFit.escape(node).escaped
-  let scale = 1
-  for (let step = 0; step < steps && escaped(); step++) {
-    scale = Math.max(floor, scale - 0.12)
-    node.style.fontSize = `${+(base * scale).toFixed(2)}px`
-    if (scale === floor) break
+  let size = base
+  let verdict = TmTextFit.escape(node)
+  for (let step = 0; step < steps && verdict.escaped && size > floorPx; step++) {
+    size = Math.max(floorPx, +(size - stepPx).toFixed(2))
+    node.style.fontSize = `${size}px`
+    // Measured at the size just written, so the trace describes the number the
+    // reader would actually see, not the one before it.
+    verdict = TmTextFit.escape(node)
+  }
+  // A number that fits keeps the stylesheet's look: the inline override is only
+  // the shrink, never a copy of the designed size.
+  if (size === base) node.style.fontSize = ''
+  if (node.id) {
+    const rect = node.getBoundingClientRect()
+    traceFit({
+      at: Math.round(performance.now()),
+      id: node.id,
+      base,
+      size,
+      floorPx,
+      inline: node.style.fontSize,
+      client: node.clientWidth,
+      scroll: node.scrollWidth,
+      escaped: verdict ? verdict.escaped : null,
+      wall: verdict ? verdict.wall : null,
+      ink: verdict ? verdict.ink : null,
+      rect: [Math.round(rect.left), Math.round(rect.right), Math.round(rect.top), Math.round(rect.bottom)],
+      view: document.body.classList.contains('view-deck') ? 'deck' : 'strip',
+      inner: [window.innerWidth, window.innerHeight]
+    })
   }
 }
 

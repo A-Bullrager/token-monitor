@@ -256,6 +256,16 @@ const MEASURE = `(() => {
       text: node.textContent.trim(),
       inline: node.style.fontSize || '',
       size: getComputedStyle(node).fontSize,
+      // The product's own verdict, from the same rule and the same instant as
+      // the clip list: this is what decides whether the reader is losing text,
+      // instead of the check's older "a number this size must have shrunk".
+      escaped: TmTextFit.escape(node).escaped,
+      // Whether the standing watch's set still names this node, and the fitter's
+      // last few decisions on it — the evidence a platform nobody has in the
+      // room otherwise cannot give.
+      mapHas: typeof fittedNodes === 'undefined' ? null : fittedNodes.has(node),
+      trace: (typeof fitTrace === 'undefined' ? [] : fitTrace)
+        .filter((entry) => entry.id === 'stripToday').slice(-12),
       // Both forms of the same fact: the raw attribute and the CSSOM view of it.
       // A runner that reports an inline size the page is not rendering needs
       // those in the artifact, because the difference between "the fitter wrote
@@ -515,10 +525,13 @@ async function runOne(locale, view) {
       if (fixture.name === 'millions') {
         // Only grade where the element is actually laid out: in the deck form the
         // strip is display:none, so fitting correctly does nothing there. The
-        // witness is the used size, not the inline attribute — a pass can leave
-        // the shrink in the cascade with the attribute empty, and CI showed that
-        // on one runner. Nothing else in the app puts 11.2px on this element.
-        if (today.shown && !(parseFloat(today.size) < 16)) {
+        // witness asks the reader's question — the product's own escape verdict —
+        // rather than "a number this wide must have shrunk": the same figure can
+        // honestly fit unshrunk on a narrower platform, and the check was calling
+        // that a failure until a runner's font proved otherwise. The used size is
+        // still read, because an escape should have been answered by a shrink to
+        // something below the strip's 16px.
+        if (today.shown && today.escaped && !(parseFloat(today.size) < 16)) {
           // macOS ARM later reported the opposite shape: the inline attribute said
           // 11.2px, the used size still said 16px, three watch passes after the
           // stress. That is not the same failure as a fitter that never ran, and
@@ -627,7 +640,13 @@ const findings = results.flatMap((run) => run.findings || [])
 // one platform's strip figure gives out while another's ledger line does. What
 // still fails is a slot nobody documented giving out — the day the 30-day row
 // stops being the problem and the *tokens* row starts, that is a new fact.
-const KNOWN_GIVEOUT = new Set(['stripToday', 'stripBalance', 'deckBalance', 'deckToday', 'deckThirty'])
+// deckBalanceSub joined the list after Apple Silicon measured the German
+// breakdown line six pixels past its wall at ¥90,000,000,000 + ¥10,000,000,000.
+// It is the summary under the headline, compacted since round 34 and already at
+// its readability floor; the extreme fixture is exactly where the instrument is
+// allowed to stop, and the day a *different* slot breaks there is still a new
+// fact. See the README's documented limit.
+const KNOWN_GIVEOUT = new Set(['stripToday', 'stripBalance', 'deckBalance', 'deckBalanceSub', 'deckToday', 'deckThirty'])
 const limitSlots = [...new Set(atTheLimit.map((item) => `${item.run} ${item.slot}`))].sort()
 const beyondLimit = [...new Set(atTheLimit.filter((item) => !KNOWN_GIVEOUT.has(item.slot))
   .map((item) => `${item.run} ${item.slot} by ${item.pixels}px: ${item.text}`))]

@@ -36,10 +36,22 @@
     const range = document.createRange()
     range.selectNodeContents(el)
     const rects = range.getClientRects()
-    if (!rects.length) return el.getBoundingClientRect().right
-    let right = 0
-    for (const rect of rects) right = Math.max(right, rect.right)
-    return right
+    if (rects.length) {
+      let right = 0
+      for (const rect of rects) right = Math.max(right, rect.right)
+      return right
+    }
+    // No text rectangles is not the same as no ink. On a runner whose window
+    // is never composited, a Range created right after the size was written can
+    // come back empty while the element still lays its text out — and the old
+    // fallback (the element's own right edge) then reported a 113px text in a
+    // 78px slot as fitting, which is how a whole fixture went unshrunk on macOS.
+    // The layout's own extent is the honest fallback, and `max` covers both
+    // left- and right-aligned text: one of the two is the drawn right edge.
+    const box = el.getBoundingClientRect()
+    return el.scrollWidth > el.clientWidth + 1
+      ? Math.max(box.right, box.left + el.scrollWidth)
+      : box.right
   }
 
   // The wall: the clip edge, or any neighbour that starts to the right of this
