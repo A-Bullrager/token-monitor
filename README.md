@@ -60,7 +60,7 @@ The two images below come from a live window rather than the staged showcase, as
 ## Download and run
 
 Releases: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Development builds are in the Artifacts of each Actions run.
-**[v2.7.0](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.0) is the current release** — the one that changed the interface's Chinese face, and with it the last thing this project had to take on trust: MiSans is gone from what ships, and the bundle now carries a subset of Noto Sans SC under SIL OFL 1.1, so the licence no longer rests on an interpretation of a grant that was explicitly revocable. The language picker says `中文` in every language, the ledger's balance breakdown compacts from ¥10,000 rather than ¥1,000,000, and the workflow's actions moved onto the majors that run on Node 24. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and GitHub's own asset digest, and was extracted and launched on a real Windows 10 machine reporting version 2.7.0 with `isPackaged`; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop. It supersedes v2.6.2, whose published build still draws the breakdown line at a million — a released version is never rewritten.
+**[v2.7.1](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.1) is the current release** — the one that moved the morph into the page and made the numbers fit the frame they are measured in. The window is resized at most twice per morph, the moving edge is a page clip, and the card is pinned so nothing re-lays-out mid-reveal; the fitter takes one ladder step per rendered frame, so a figure that fits at 12.16px is no longer walked down to the 11.2px floor. Reduced motion is honoured by the product and graded as its own scenario, and the card's surface is tinted glass (0.9 light / 0.88 dark) with a thin sheet under every instrument. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and GitHub's own asset digest, and was extracted and launched on a real Windows 10 machine reporting version 2.7.1 with `isPackaged`; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop. It supersedes v2.7.0, which remains the release that replaced the interface's Chinese face and the last thing this project had to take on trust — a released version is never rewritten.
 
 | Platform | Package | How to run it |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 16 language scenarios × 4 interface states pass, every collected character is inside the corpus, no label is clipped in any shipped language, and 10 number-fit runs × 10 magnitudes leave no number outside its box.
 
-**Fifty-nine cloud rounds so far; the v2.7.0 release is green on all four native runners, and main is green again after the morph thread's run of red rounds.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat. One of those negatives is about the tests themselves: the morph check was blind on macOS, where the window edge moves after the CSS class it sampled had already gone (round 12), so it now grades the observed motion instead.
+**Sixty-two cloud rounds so far; the v2.7.1 release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat. One of those negatives is about the tests themselves: the morph check was blind on macOS, where the window edge moves after the CSS class it sampled had already gone (round 12), so it now grades the observed motion instead.
 
 <details>
 <summary>Cloud build history (rounds 1–13)</summary>
@@ -282,6 +282,12 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 **Round 59 (`4a28ee6`, all four green)**: the fit now takes one step per rendered frame. The browser commits layout at the frame boundary, and on these runners a font-size written and re-measured in one task reports the previous text's size — so the ladder had been measuring its own shadow. `fitNumber` puts the slot back at its designed size and starts a chain; each step measures what the browser actually laid out since the last frame, shrinks one rung, and schedules the next on `requestAnimationFrame`, with a bounded timer behind it for a page that is not painting. The rule, the ladder and the floor are unchanged. A figure that has not changed is no longer refitted: the watch only asks whether its metrics moved without a render, and a hidden form stops the chain where it is instead of erasing a good fit. The four green reports now show the millions and eight-figure fixtures at **12.16px with 11 and 5 pixels of ink to spare**, instead of the floor, and the eleven-figure giveout at 11.2px exactly as documented.
 
+**Round 60 (`e355b2d`, all four green)**: documentation only — rounds 45–59 written down in five languages, including the over-shrink that round 58's own reports exposed and round 59 removed, the reduced-motion finding, and the six documented giveout slots.
+
+**Round 61 (`5013e81`, all four green)**: version 2.7.1. The package, the lockfile, the renderer's static label and its state default moved together, and the settings screenshot was regenerated so the shipped image does not show the previous number; `check:release` reported the four in agreement.
+
+**Round 62 (`v2.7.1` tag, run 41817145615)**: the tag run built and tested all four native packages, and the release job verified six filenames and their digests against the files the runners built, then published six packages plus `SHA256SUMS.txt`. Its first attempt failed at the upload of the Windows ZIP with a transient `HTTP 404` from GitHub's asset API — a draft holding five of six packages — and the failed job was re-run, not the threshold relaxed: the same job found the draft, uploaded all seven assets, and published. The Windows ZIP was re-downloaded from the release page, matched both the published checksum list and GitHub's own asset digest, and was extracted and launched on this machine reporting 2.7.1 with `isPackaged`; Linux and macOS are covered by their own runners only.
+
 </details>
 
 **Closed by v2.7.0**: the ledger's balance breakdown switches to compact units from ten thousand up rather than from a million, so a German line with one of those two fields between ¥10,000 and ¥999,999.99 no longer loses its last eight pixels on a machine whose metrics are tight. The published v2.6.2 still draws it at a million, and will: a released version is never rewritten.
@@ -324,7 +330,7 @@ These checks do **not** prove complete cmap coverage, every fallback glyph, nati
 
 ## GitHub Actions and releases
 
-The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published six times — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2 and v2.7.0. A weekly scheduled run against `main` catches runner-image drift while no release is waiting on the answer; the Electron and electron-builder downloads are cached per platform and lockfile, because a cold runner was re-fetching ~100MB before it ran anything; and after publishing, the release job re-checks the asset set, the published digests and `SHA256SUMS.txt` against the files the runners built — a step that first ran on v2.7.0, failed there on its own field name, and has since been checked against the live release.
+The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published seven times — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2, v2.7.0 and v2.7.1. A weekly scheduled run against `main` catches runner-image drift while no release is waiting on the answer; the Electron and electron-builder downloads are cached per platform and lockfile, because a cold runner was re-fetching ~100MB before it ran anything; and after publishing, the release job re-checks the asset set, the published digests and `SHA256SUMS.txt` against the files the runners built — a step that first ran on v2.7.0, failed there on its own field name, and has since been checked against the live release.
 A local `git commit` triggers nothing in the cloud; a push, a pull request or a manual run does. GitHub Packages is for npm / container registries and the like — this project distributes desktop binaries through Artifacts and Release assets.
 
 | Trigger | Behaviour |
@@ -359,7 +365,7 @@ A tag containing `-` (for example `v2.7.0-beta.1`) is published as a pre-release
 
 ```bash
 git push origin main          # first: let all four runners go green on the new commit
-git push origin v2.7.0        # then: push the tag alone, which is what triggers a Release
+git push origin v2.7.1        # then: push the tag alone, which is what triggers a Release
 ```
 
 GitHub documentation: [hosted runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
