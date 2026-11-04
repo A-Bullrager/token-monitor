@@ -27,9 +27,13 @@
 
 :root {
   /* Apple system surfaces */
+  /* Surfaces that sit ON the glass. These used to be opaque whites because the
+     card below them was opaque; now the card is a 0.9 tint, so a pure-white
+     chip reads as a sticker pasted on the card. One step cooler, and only as
+     light as the sheet they sit on. */
   --paper: #ffffff;
-  --paper-2: #f2f2f7;
-  --paper-3: #e9e9ee;
+  --paper-2: #f6f7fb;
+  --paper-3: #eceef4;
   --ink: #1c1c1e;
   --ink-2: #3a3a3c;
   --muted: rgba(60, 60, 67, 0.62);
@@ -49,16 +53,19 @@
   --panel-edge: rgba(0, 0, 0, 0.06);
   --panel-highlight: rgba(255, 255, 255, 0.9);
   --shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05), 0 6px 14px rgba(0, 0, 0, 0.09);
-  /* The frost: a pane is not one colour. Light enters along the top edge, the
-     body of the glass is a milky cool white rather than paper white, and the
-     depth gathers toward the bottom where the pane thickens over the desk. */
-  --frost-light: #ffffff;
-  --frost-body: #f4f6fa;
-  --frost-deep: #e9ecf3;
-  --frost-bloom: rgba(255, 255, 255, 0.98);
-  --frost-depth: rgba(120, 136, 184, 0.22);
-  --frost-rim: rgba(60, 60, 67, 0.08);
-  --grain-opacity: 0.07;
+  /* Glass, and it has to be glass: the window is transparent and the desktop
+     really is behind this card, so the card is a tint over it rather than a
+     painted sheet. A milky gradient with full opacity — the previous pass —
+     is paper: nothing can show through it. Apple's own answer to the
+     readability tension in iOS 26.1 was a choice between transparent and
+     tinted; these are the glass values, and --glass-base is the one dial that
+     a tinted mode would raise. */
+  --glass-base: rgba(255, 255, 255, 0.9);
+  --glass-sheet: rgba(255, 255, 255, 0.42);
+  --glass-sheet-edge: rgba(255, 255, 255, 0.55);
+  --glass-bloom: rgba(255, 255, 255, 0.5);
+  --frost-rim: rgba(60, 60, 67, 0.1);
+  --grain-opacity: 0.05;
   --stage-caption: #ffffff;
   --stage-muted: rgba(255, 255, 255, 0.72);
   --serif: var(--sans);
@@ -69,9 +76,11 @@
 }
 
 body.theme-dark {
-  --paper: #1c1c1e;
-  --paper-2: #2c2c2e;
-  --paper-3: #3a3a3c;
+  /* The same lift in smoke: surfaces are a touch lighter than the glass under
+     them, which is what makes the layering visible over a dark wallpaper. */
+  --paper: #202024;
+  --paper-2: #2b2b30;
+  --paper-3: #3a3a40;
   --ink: #ffffff;
   --ink-2: #ebebf5;
   --muted: rgba(235, 235, 245, 0.6);
@@ -90,16 +99,14 @@ body.theme-dark {
   --panel-edge: rgba(255, 255, 255, 0.08);
   --panel-highlight: rgba(255, 255, 255, 0.08);
   --shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 2px 6px rgba(0, 0, 0, 0.35), 0 8px 16px rgba(0, 0, 0, 0.3);
-  /* The same pane smoked: the top catches a reflection of the room rather than
-     light through it, the body is charcoal with a blue cast, and the grain reads
-     brighter because screen blending scatters less per pixel over a dark field. */
-  --frost-light: #26262a;
-  --frost-body: #1f1f22;
-  --frost-deep: #141416;
-  --frost-bloom: rgba(255, 255, 255, 0.12);
-  --frost-depth: rgba(0, 0, 0, 0.45);
+  /* The same glass, smoked. The sheet is a light film over the tint rather than
+     a second colour, so the two levels stay visible over a dark wallpaper. */
+  --glass-base: rgba(20, 20, 22, 0.88);
+  --glass-sheet: rgba(255, 255, 255, 0.05);
+  --glass-sheet-edge: rgba(255, 255, 255, 0.09);
+  --glass-bloom: rgba(255, 255, 255, 0.07);
   --frost-rim: rgba(255, 255, 255, 0.06);
-  --grain-opacity: 0.09;
+  --grain-opacity: 0.06;
 }
 
 * {
@@ -234,9 +241,25 @@ select,
   z-index: -1;
   border-radius: inherit;
   pointer-events: none;
-  background:
-    radial-gradient(140% 70% at 50% -12%, var(--frost-bloom) 0%, rgba(255, 255, 255, 0) 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0) 42%, var(--frost-depth) 100%);
+  /* Light entering along the top edge only. A bottom "depth" wash was right
+     for an opaque sheet and wrong here: through it the wallpaper dims toward
+     the bottom and the card reads as tinted paper again. */
+  background: radial-gradient(140% 70% at 50% -12%, var(--glass-bloom) 0%, rgba(255, 255, 255, 0) 62%);
+}
+
+/* The second level: the instruments sit on their own thin sheets, so a reading
+   has a surface of its own instead of hanging over the wallpaper. Paint only —
+   an inset ring rather than a border, and no padding — because every block
+   here has a measured size and the text-fitting gates are built on it. */
+.strip-runway,
+.strip-scale,
+.strip-today,
+.hero,
+.chart-section,
+.mix-section {
+  background: var(--glass-sheet);
+  box-shadow: inset 0 0 0 1px var(--glass-sheet-edge);
+  border-radius: 12px;
 }
 
 .panel::before {
@@ -2383,22 +2406,28 @@ body {
 
 /* ── material ─────────────────────────────────────────────── */
 
-/* Frosted glass, drawn rather than borrowed.
-   The window is transparent and the card is the page's top surface: there is
-   nothing behind it to blur, so backdrop-filter would blur nothing, and letting
-   the desktop through would make the interface read as whatever wallpaper happens
-   to be behind it — per platform, per moment, per user. So the frost is built
-   from what a thick pane does to light instead: a bright band where light enters
-   along the top edge, a milky cool body that is not paper white (a bloom over
-   pure white is invisible, which is why this whole surface used to look flat),
-   depth that gathers toward the bottom, a hairline rim all round, and a grain
-   fine enough to scatter the flat fields without dirtying the text.
-   All of it is paint, so it is the same picture on Windows, macOS and Linux. */
+/* Tinted glass, drawn rather than borrowed.
+   The window is transparent and the card is the page's top surface. There is
+   nothing behind the card for backdrop-filter to blur — the desktop is behind
+   the *window*, and a page cannot sample it — so the material has to be made of
+   light instead. Three parts: a translucent tint (--glass-base) that lets the
+   desktop colour through just enough to belong to the scene; a set of thin
+   sheets (--glass-sheet) that carry every reading, so numbers sit on their own
+   surface rather than directly on the tint; and a hairline rim plus one bloom
+   along the top edge where light enters. A little grain keeps the flat fields
+   from reading as plastic. All of it is paint, so the picture is the same on
+   Windows, macOS and Linux.
+   The tint is deliberately high (0.9 light / 0.88 dark). A fully transparent
+   pane was tried and failed the only test that matters: over a pink wallpaper
+   the micro labels lost contrast and the card read as tinted paper. Without a
+   real blur, transparency and legibility trade directly; this is the point on
+   that curve where the card still belongs to the desktop and every figure is
+   still readable. Platforms that can lend a system material can raise the tint
+   without touching anything else — --glass-base is the single dial. */
 .panel {
   border-radius: 18px;
   border: 1px solid var(--panel-edge);
-  background: linear-gradient(180deg, var(--frost-light) 0%, var(--frost-body) 55%, var(--frost-deep) 100%);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 28px rgba(0, 0, 0, 0.11);
+  background: var(--glass-base);
 }
 
 body.theme-dark .panel {
