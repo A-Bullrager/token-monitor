@@ -52,10 +52,14 @@
   --vermilion-soft: rgba(255, 59, 48, 0.12);
   --panel-edge: rgba(0, 0, 0, 0.06);
   --panel-highlight: rgba(255, 255, 255, 0.9);
-  /* Tight enough to fit inside the 5px stage gutter: the old 14-20px blur was
-     what needed the 36px envelope, and a clipped blur would draw a hard edge at
-     the window. The rim, bloom and glass carry the depth now. */
-  --shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 1px 4px rgba(0, 0, 0, 0.08);
+  /* Every layer ends by 6px: the rim, a 1px contact, a 2px near layer and a
+     5px ambient pulled in with a negative spread. The stack decays over the
+     whole envelope instead of stopping at the window edge. */
+  --shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.05),
+    0 1px 1px rgba(0, 0, 0, 0.07),
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    0 2px 5px -2px rgba(0, 0, 0, 0.12);
   /* Glass, and it has to be glass: the window is transparent and the desktop
      really is behind this card, so the card is a tint over it rather than a
      painted sheet. A milky gradient with full opacity — the previous pass —
@@ -101,7 +105,14 @@ body.theme-dark {
   --vermilion-soft: rgba(255, 69, 58, 0.2);
   --panel-edge: rgba(255, 255, 255, 0.08);
   --panel-highlight: rgba(255, 255, 255, 0.08);
-  --shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 1px 4px rgba(0, 0, 0, 0.5);
+  /* Dark mode carries its separation on the white rim and the glass tint; the
+     shadow is a contact hint, not a black band. The first pass used 0.4/0.25/
+     0.45 and read as a dirty edge on a light or coloured wallpaper. */
+  --shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 1px 1px rgba(0, 0, 0, 0.2),
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    0 2px 5px -2px rgba(0, 0, 0, 0.24);
   /* The same glass, smoked. The sheet is a light film over the tint rather than
      a second colour, so the two levels stay visible over a dark wallpaper. */
   --glass-base: rgba(20, 20, 22, 0.88);
@@ -213,11 +224,12 @@ select,
 .stage {
   position: fixed;
   inset: 0;
-  /* The card's shadow envelope. It was 36px, which made the transparent window
-     a large invisible input area; 5px fits the shadow below and keeps the
-     window's rectangle close to the card. The card's screen position is held by
-     CARD_INSET in main.js, so shrinking this does not move the card. */
-  padding: 5px;
+  /* The card's shadow envelope, capped at 6px. It was 36px (a large invisible
+     input area) and then 5px (too little for a falloff); 6px is the ceiling,
+     and the shadow below is built to end inside it. The gutter is click-through,
+     so its size costs no input. The card's screen position is held by
+     CARD_INSET in main.js, so changing this does not move the card. */
+  padding: 6px;
   display: flex;
 }
 

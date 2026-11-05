@@ -110,7 +110,7 @@ try {
   await capture('live-strip.png')
 
   await evaluate("document.querySelector('.strip-main').click()")
-  await waitFor("document.body.classList.contains('view-deck') && window.innerWidth === 514")
+  await waitFor("document.body.classList.contains('view-deck') && window.innerWidth === 516")
   await sleep(700)
   out.deck = await evaluate(`(() => {
     const panel = document.getElementById('panel')

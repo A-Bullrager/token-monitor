@@ -174,10 +174,10 @@ try {
 
   const settleMs = (Number(process.env.TM_MORPH_MS) || 300) + 700
   await run('expand', "document.querySelector('.strip-main').click()", settleMs)
-  await waitFor("document.body.classList.contains('view-deck') && window.innerWidth === 514")
+  await waitFor("document.body.classList.contains('view-deck') && window.innerWidth === 516")
   await sleep(700)
   await run('collapse', "document.querySelector('.deck-head [data-action=\"collapse\"]').click()", settleMs)
-  await waitFor("document.body.classList.contains('view-strip') && window.innerWidth === 514")
+  await waitFor("document.body.classList.contains('view-strip') && window.innerWidth === 516")
 
   await evaluate('window.tm.quit()')
   await sleep(600)

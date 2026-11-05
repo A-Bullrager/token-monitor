@@ -49,22 +49,25 @@ const IS_SHOT = Boolean(SHOT_MODE)
 const USE_CONFIG_IN_SHOT = process.argv.includes('--use-config')
 const FORCE_DARK = process.argv.includes('--dark') || SHOT_MODE === 'dark'
 
-// The window is the card plus a small shadow envelope. It used to be 36px on
-// every side, which left a large invisible input area around the card; the
-// shadow now fits in 5px and the window hugs the card. The card itself sits 48px
-// from the work area's top/right edge as before, so shrinking the envelope moves
-// the window edge in, not the card. The deck is sized to its content: head 44 +
-// scroll + foot 39 + 10 margin + 2 border. Both forms share one width: the
-// strip used to be 40px narrower, so a morph resized the window horizontally as
-// well as vertically — and the strip's content, laid out at the union width
-// during the reveal, reflowed when the window came down onto it: a visible
-// jitter on the last frame. One width makes the morph a pure vertical reveal,
-// and gives the strip's fixed columns the room their labels were squeezing into.
-const STAGE_GUTTER = 5
+// The window is the card plus a 6px shadow envelope (the user's hard limit for
+// the transparent area). Six pixels cannot hold a wide ambient shadow; what it
+// can hold is a layered contact shadow whose layers all end before the window
+// edge, so the falloff reads as depth rather than as a grey border cut off by
+// the window. The gutter is click-through (setMouseThrough), so it costs the
+// desktop no input. The card itself sits 48px from the work area's top/right
+// edge, so the window edge moves with the envelope, not the card. The deck is
+// sized to its content: head 44 + scroll + foot 39 + 12 margin + 2 border. Both
+// forms share one width: the strip used to be 40px narrower, so a morph resized
+// the window horizontally as well as vertically — and the strip's content, laid
+// out at the union width during the reveal, reflowed when the window came down
+// onto it: a visible jitter on the last frame. One width makes the morph a pure
+// vertical reveal, and gives the strip's fixed columns the room their labels
+// were squeezing into.
+const STAGE_GUTTER = 6
 const CARD_INSET = 48
-const FORM_WIDTH = 514
-const STRIP_SIZE = { width: FORM_WIDTH, height: 150 }
-const DECK_SIZE = { width: FORM_WIDTH, height: 818 }
+const FORM_WIDTH = 516
+const STRIP_SIZE = { width: FORM_WIDTH, height: 152 }
+const DECK_SIZE = { width: FORM_WIDTH, height: 820 }
 
 let mainWindow = null
 let tray = null
@@ -283,6 +286,14 @@ function trayImage() {
 // the page see moves returning over the card on Windows and macOS; Linux has
 // no forwarding, so a guarded poll takes the window back when the real cursor
 // is inside the card. The poll only runs while the window is ignoring.
+function cursorIsOverCard() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false
+  const point = screen.getCursorScreenPoint()
+  const box = mainWindow.getBounds()
+  return point.x >= box.x + STAGE_GUTTER && point.x <= box.x + box.width - STAGE_GUTTER &&
+    point.y >= box.y + STAGE_GUTTER && point.y <= box.y + box.height - STAGE_GUTTER
+}
+
 function setMouseThrough(through) {
   if (!mainWindow || mainWindow.isDestroyed()) return
   mainWindow.setIgnoreMouseEvents(Boolean(through), { forward: true })
@@ -301,24 +312,25 @@ function setMouseThrough(through) {
       mouseThroughPoll = null
       return
     }
-    const point = screen.getCursorScreenPoint()
-    const box = mainWindow.getBounds()
-    const inside = point.x >= box.x + STAGE_GUTTER && point.x <= box.x + box.width - STAGE_GUTTER &&
-      point.y >= box.y + STAGE_GUTTER && point.y <= box.y + box.height - STAGE_GUTTER
-    if (!inside) return
+    if (!cursorIsOverCard()) return
     clearInterval(mouseThroughPoll)
     mouseThroughPoll = null
     mainWindow.setIgnoreMouseEvents(false)
   }, 150)
 }
 
+// On show the window may land under the cursor, and a click arriving before a
+// move must still hit whichever side the cursor is on. Ask the real pointer
+// instead of starting interactive until the first report.
+function syncMouseThrough() {
+  setMouseThrough(!cursorIsOverCard())
+}
+
 function revealWindow() {
   if (!mainWindow) return
   if (mainWindow.isMinimized()) mainWindow.restore()
   mainWindow.show()
-  // A hidden window keeps neither the pointer nor the last click-through
-  // decision; it is shown answering input until the renderer says otherwise.
-  setMouseThrough(false)
+  syncMouseThrough()
   mainWindow.focus()
 }
 
@@ -476,9 +488,9 @@ function createWindow() {
     } else {
       mainWindow.showInactive()
     }
-    // A window shown under the cursor must answer that cursor even if no move
-    // arrives first; the gutter becomes click-through only on the next report.
-    setMouseThrough(false)
+    // The window may land under the cursor; decide from the real pointer so a
+    // click arriving before any move still goes to the right side.
+    syncMouseThrough()
     if (config.alwaysOnTop && !showcase) applyAlwaysOnTop(true)
   })
 
@@ -780,7 +792,7 @@ if (!gotLock) {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.show()
-      setMouseThrough(false)
+      syncMouseThrough()
       mainWindow.webContents.send('view:changed', currentView)
     }
   })
