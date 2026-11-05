@@ -219,9 +219,9 @@ async function quit() {
 
 const viewExpr = (name) => `document.body.classList.contains('${name}')`
 // What a view wait saw, for the message when it timed out: the class says
-// whether the renderer agreed, the window width says whether the operating
-// system finished moving the card, and the renderer's own state says whether the
-// two of them disagree.
+// whether the renderer agreed, the window height says whether the operating
+// system finished moving the card (both forms share a width now), and the
+// renderer's own state says whether the two of them disagree.
 const VIEW_DIAGNOSE = `(() => ({
   classes: document.body.className,
   inner: [window.innerWidth, window.innerHeight],
@@ -270,7 +270,22 @@ try {
   assert.ok(report.firstLaunch.strip.sparkPaths >= 2)
   assert.match(report.firstLaunch.strip.gaugeClass, /state-ok/)
   assert.equal(report.firstLaunch.strip.gaugeRatio, '0.66')
-  assert.ok(report.firstLaunch.strip.inner[0] >= 520 && report.firstLaunch.strip.inner[0] <= 560)
+  assert.ok(report.firstLaunch.strip.inner[0] >= 500 && report.firstLaunch.strip.inner[0] <= 540,
+    `the strip must open at the shared form width, not the old narrower one (${report.firstLaunch.strip.inner[0]}px)`)
+
+  // The window is a rectangle; the card is not. The stage gutter must report
+  // itself as outside the panel so main can make the window click-through,
+  // and a move back over the card must take that back. This grades the report,
+  // not the OS call — Electron owns the latter.
+  await session.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 4, y: 4 })
+  await sleep(200)
+  const gutterThrough = await evaluate("document.documentElement.dataset.mouseThrough")
+  await session.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 100, y: 100 })
+  await sleep(200)
+  const cardThrough = await evaluate("document.documentElement.dataset.mouseThrough")
+  report.firstLaunch.mouseThrough = { gutter: gutterThrough, card: cardThrough }
+  assert.equal(gutterThrough, '1', 'a pointer in the transparent stage gutter must report click-through')
+  assert.equal(cardThrough, '0', 'a pointer over the card must take click-through back')
 
   // settings from the strip should expand the deck first
   await evaluate("document.getElementById('stripStatus').click()")
@@ -332,7 +347,7 @@ try {
   assert.ok(deckScroll.client > 0 && deckScroll.clientWidth > 0, 'deck must have a usable scroll area')
   assert.ok(deckScroll.width <= deckScroll.clientWidth + 1, 'deck must not overflow horizontally')
   assert.ok(deckScroll.top >= 0 && deckScroll.bottom <= report.firstLaunch.deck.inner[1] + 1, 'deck scroll area must fit the viewport')
-  if (report.firstLaunch.deck.inner[1] >= 880) {
+  if (report.firstLaunch.deck.inner[1] >= 800) {
     assert.ok(deckScroll.height <= deckScroll.client + 1, 'full-height deck must not scroll')
   } else {
     assert.match(deckScroll.overflowY, /^(auto|scroll)$/, 'short deck must allow scrolling')
@@ -342,7 +357,11 @@ try {
     }
   }
   assert.ok(deckScroll.lastBottom <= deckScroll.bottom + 1, 'last deck section must be reachable')
-  assert.ok(report.firstLaunch.deck.inner[0] >= 560 && report.firstLaunch.deck.inner[0] <= 600)
+  assert.ok(report.firstLaunch.deck.inner[0] >= 500 && report.firstLaunch.deck.inner[0] <= 540)
+  // One form width: the morph is a vertical reveal, and the strip must not be
+  // re-laid-out when the window comes down onto it.
+  assert.equal(report.firstLaunch.deck.inner[0], report.firstLaunch.strip.inner[0],
+    `both forms must share one width (strip ${report.firstLaunch.strip.inner[0]}px, deck ${report.firstLaunch.deck.inner[0]}px)`)
 
   // theme preview reverts when the sheet closes
   await evaluate("document.querySelector('#themeSeg [data-theme=\"dark\"]').click()")
@@ -472,6 +491,12 @@ try {
           // The window edge is what moves now; the card is laid out once and
           // revealed, so the two series say different things and both are needed.
           win: window.innerHeight,
+          // Both forms share one width, so a morph must never change it. The
+          // width is sampled to grade that directly: a horizontal resize would
+          // reflow the strip when the window comes down — the last-frame jitter
+          // the shared width exists to remove.
+          w: window.innerWidth,
+          pw: Math.round(panel.getBoundingClientRect().width),
           strip: Math.round(strip.getBoundingClientRect().height),
           deck: Math.round(deck.getBoundingClientRect().height),
           so: +getComputedStyle(strip).opacity,
@@ -507,6 +532,8 @@ try {
   const gradeMorph = (run) => {
     const heights = run.samples.map((s) => s.panel)
     const wins = run.samples.map((s) => s.win ?? s.panel)
+    const widths = run.samples.map((s) => s.w ?? 0)
+    const panelWidths = run.samples.map((s) => s.pw ?? 0)
     const resting = heights.at(-1)
     const delta = run.before - resting
     const fading = run.samples.filter((s) => s.morphing)
@@ -543,6 +570,12 @@ try {
       panelTo: resting,
       winFrom,
       winTo,
+      // One width for both forms: the window may grow and shrink vertically
+      // during a morph, never horizontally.
+      widthFrom: widths[0],
+      widthTo: widths.at(-1),
+      widthSpread: Math.max(...widths) - Math.min(...widths),
+      panelWidthSpread: Math.max(...panelWidths) - Math.min(...panelWidths),
       // Distinct window sizes strictly between the two resting ones: proof the
       // reveal arrived spread over frames instead of in one jump.
       winIntermediate: new Set(wins.filter((h) => h < winFrom - 1 && h > winTo + 1)).size,
@@ -643,7 +676,9 @@ try {
     frames: grade.frames, fadingFrames: grade.fadingFrames, revealSteps: grade.revealSteps,
     revealTravel: grade.revealTravel, panelChanges: grade.panelChanges,
     panelFrom: grade.panelFrom, panelTo: grade.panelTo, panelDelta: grade.panelDelta,
-    winIntermediate: grade.winIntermediate, sampledUntil: grade.sampledUntil
+    winIntermediate: grade.winIntermediate, sampledUntil: grade.sampledUntil,
+    widthFrom: grade.widthFrom, widthTo: grade.widthTo, widthSpread: grade.widthSpread,
+    panelWidthSpread: grade.panelWidthSpread
   }))
   // The window's side, read from the main process's own trace (TM_MORPH_DEBUG=1,
   // which CI sets for this matrix). Kept because the two witnesses answer
@@ -732,6 +767,17 @@ try {
     graded.panelChanges <= 1,
     `the card was re-laid-out ${graded.panelChanges} times during one morph; it must be pinned and revealed — ${JSON.stringify(graded.panelMoves)} series ${JSON.stringify(graded.panelSeries)}`
   )
+  // Both forms share one width (FORM_WIDTH in main.js). If a morph changes the
+  // window's width, the strip is re-laid-out when the window comes down onto it
+  // — the visible jitter on the last frame this architecture removes.
+  assert.ok(
+    graded.widthSpread <= 1,
+    `the window changed width during the morph (${graded.widthFrom} -> ${graded.widthTo}, spread ${graded.widthSpread}px); both forms share one width and the morph must be vertical only`
+  )
+  assert.ok(
+    graded.panelWidthSpread <= 1,
+    `the card changed width during the morph (spread ${graded.panelWidthSpread}px); it must be laid out once`
+  )
   assert.ok(
     graded.dimmest > 0.45,
     `card went empty mid-morph (best opacity ${graded.dimmest})`
@@ -744,7 +790,9 @@ try {
   assert.ok(stripHi - stripLo <= 10, `strip stretched during morph: ${stripLo}..${stripHi}`)
 
   // collapse + persisted view
-  await waitFor('collapsed', `${viewExpr('view-strip')} && window.innerWidth < 560`, 25000, VIEW_DIAGNOSE)
+  // The forms now share a width, so their heights are what tells them apart:
+  // the strip is 212 tall, the deck 880.
+  await waitFor('collapsed', `${viewExpr('view-strip')} && window.innerHeight < 400`, 25000, VIEW_DIAGNOSE)
   await waitConfig((config) => config.view === 'strip', 'view strip')
   report.firstLaunch.collapsed = await evaluate(`({
     view: document.body.className,
@@ -755,7 +803,7 @@ try {
 
   await evaluate("document.querySelector('.strip-main').click()")
   try {
-    await waitFor('expanded again', `${viewExpr('view-deck')} && window.innerWidth > 520`, 25000, VIEW_DIAGNOSE)
+    await waitFor('expanded again', `${viewExpr('view-deck')} && window.innerHeight > 700`, 25000, VIEW_DIAGNOSE)
   } catch (error) {
     // A bounded, recorded second click — the same shape as the morph attempts. On a
     // contended runner the window can still be moving while the renderer has
@@ -765,7 +813,7 @@ try {
     report.firstLaunch.expandRetry = { first: String(error).slice(0, 700) }
     await evaluate("document.querySelector('.strip-main').click()")
     await waitFor('expanded again after one recorded retry',
-      `${viewExpr('view-deck')} && window.innerWidth > 520`, 25000, VIEW_DIAGNOSE)
+      `${viewExpr('view-deck')} && window.innerHeight > 700`, 25000, VIEW_DIAGNOSE)
     report.firstLaunch.expandRetry.recovered = true
   }
   await waitConfig((config) => config.view === 'deck', 'view deck')
@@ -880,7 +928,7 @@ try {
     privacy: document.body.classList.contains('privacy')
   })`)
   assert.match(report.relaunch.state.view, /view-deck/)
-  assert.ok(report.relaunch.state.inner[0] >= 560 && report.relaunch.state.inner[0] <= 600)
+  assert.ok(report.relaunch.state.inner[0] >= 500 && report.relaunch.state.inner[0] <= 540)
   assert.equal(report.relaunch.state.theme, 'light')
   assert.equal(report.relaunch.state.privacy, false)
   await session.evaluate("document.querySelector('.deck-head [data-action=\"collapse\"]').click()")

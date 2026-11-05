@@ -67,6 +67,19 @@
         if (rect.left >= own.right - 1) stop = Math.min(stop, rect.left)
       }
     }
+    // A visible sheet is a wall for the text it carries. The second-level
+    // surfaces (the strip's three instruments, the deck's hero, chart and mix)
+    // are the reader's box now: ink spilling past their rounded edge reads as
+    // the label escaping its display box even when nothing behind it would be
+    // lost. Marked in the markup rather than by a class list here, so the rule
+    // stays a rule and the design owns which surfaces count.
+    for (let up = el.parentElement; up && up !== document.body; up = up.parentElement) {
+      if (!up.hasAttribute || !up.hasAttribute('data-fit-wall')) continue
+      const box = up.getBoundingClientRect()
+      const style = getComputedStyle(up)
+      stop = Math.min(stop, box.right - (parseFloat(style.paddingRight) || 0))
+      break
+    }
     return stop
   }
 

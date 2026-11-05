@@ -49,14 +49,29 @@ const IS_SHOT = Boolean(SHOT_MODE)
 const USE_CONFIG_IN_SHOT = process.argv.includes('--use-config')
 const FORCE_DARK = process.argv.includes('--dark') || SHOT_MODE === 'dark'
 
-// Window sizes include a 36px transparent margin on every side so the card
-// shadow lands outside the card (.stage padding in styles.css). The deck is
-// sized to its content: head 44 + scroll + foot 39 + 72 margin + 2 border.
-const STRIP_SIZE = { width: 536, height: 212 }
-const DECK_SIZE = { width: 576, height: 880 }
+// The window is the card plus a small shadow envelope. It used to be 36px on
+// every side, which left a large invisible input area around the card; the
+// shadow now fits in 5px and the window hugs the card. The card itself sits 48px
+// from the work area's top/right edge as before, so shrinking the envelope moves
+// the window edge in, not the card. The deck is sized to its content: head 44 +
+// scroll + foot 39 + 10 margin + 2 border. Both forms share one width: the
+// strip used to be 40px narrower, so a morph resized the window horizontally as
+// well as vertically — and the strip's content, laid out at the union width
+// during the reveal, reflowed when the window came down onto it: a visible
+// jitter on the last frame. One width makes the morph a pure vertical reveal,
+// and gives the strip's fixed columns the room their labels were squeezing into.
+const STAGE_GUTTER = 5
+const CARD_INSET = 48
+const FORM_WIDTH = 514
+const STRIP_SIZE = { width: FORM_WIDTH, height: 150 }
+const DECK_SIZE = { width: FORM_WIDTH, height: 818 }
 
 let mainWindow = null
 let tray = null
+// `.stage` pads the card by STAGE_GUTTER on every side (renderer/styles.css);
+// those pixels are transparent stage, not card. Kept in one place because the
+// click-through guard below has to know where the card actually is.
+let mouseThroughPoll = null
 let showcase = IS_SHOWCASE_ARG || IS_SHOT
 let currentView = 'strip'
 let uiReady = false
@@ -110,8 +125,10 @@ function initialBounds(view) {
   const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
   const size = fitSize(view, workArea)
   return anchoredBounds(size, {
-    right: workArea.x + workArea.width - 12,
-    top: workArea.y + 12,
+    // Keep the card at CARD_INSET from the screen edge: the window edge moves
+    // in by the space the old 36px envelope used to take.
+    right: workArea.x + workArea.width - (CARD_INSET - STAGE_GUTTER),
+    top: workArea.y + (CARD_INSET - STAGE_GUTTER),
     workArea
   })
 }
@@ -260,10 +277,48 @@ function trayImage() {
   return image
 }
 
+// The card is a rounded rectangle inside a rectangular window. While the
+// pointer is over the transparent stage the window ignores the mouse, so a
+// click lands on whatever is behind it instead of on nothing. `forward` lets
+// the page see moves returning over the card on Windows and macOS; Linux has
+// no forwarding, so a guarded poll takes the window back when the real cursor
+// is inside the card. The poll only runs while the window is ignoring.
+function setMouseThrough(through) {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.setIgnoreMouseEvents(Boolean(through), { forward: true })
+  if (mouseThroughPoll) {
+    clearInterval(mouseThroughPoll)
+    mouseThroughPoll = null
+  }
+  if (!through) return
+  // Windows and macOS forward mouse moves to the page, which reports the return
+  // itself; a persistent timer there would only cost a desktop widget battery.
+  // Linux has no forwarding, so the guard is the only way back.
+  if (process.platform !== 'linux') return
+  mouseThroughPoll = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      clearInterval(mouseThroughPoll)
+      mouseThroughPoll = null
+      return
+    }
+    const point = screen.getCursorScreenPoint()
+    const box = mainWindow.getBounds()
+    const inside = point.x >= box.x + STAGE_GUTTER && point.x <= box.x + box.width - STAGE_GUTTER &&
+      point.y >= box.y + STAGE_GUTTER && point.y <= box.y + box.height - STAGE_GUTTER
+    if (!inside) return
+    clearInterval(mouseThroughPoll)
+    mouseThroughPoll = null
+    mainWindow.setIgnoreMouseEvents(false)
+  }, 150)
+}
+
 function revealWindow() {
   if (!mainWindow) return
   if (mainWindow.isMinimized()) mainWindow.restore()
   mainWindow.show()
+  // A hidden window keeps neither the pointer nor the last click-through
+  // decision; it is shown answering input until the renderer says otherwise.
+  setMouseThrough(false)
   mainWindow.focus()
 }
 
@@ -404,6 +459,13 @@ function createWindow() {
     }
   })
 
+  // Windows hands back a freshly constructed transparent window 4px wider and
+  // taller than requested (at 150% scaling the client measured 518x154 for a
+  // 514x150 request), while a bounds write lands exactly. Both forms must share
+  // one width and the card must keep its CARD_INSET, so the layout is applied
+  // once more before the window is shown.
+  mainWindow.setBounds(layout)
+
   const query = rendererQuery()
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query })
 
@@ -414,6 +476,9 @@ function createWindow() {
     } else {
       mainWindow.showInactive()
     }
+    // A window shown under the cursor must answer that cursor even if no move
+    // arrives first; the gutter becomes click-through only on the next report.
+    setMouseThrough(false)
     if (config.alwaysOnTop && !showcase) applyAlwaysOnTop(true)
   })
 
@@ -682,6 +747,15 @@ function registerIpc() {
     return theme
   })
 
+  // Only the card has pixels; everything outside its rounded box is transparent
+  // stage. A transparent Electron window still receives mouse input over those
+  // pixels, so the renderer reports when the pointer is in the gutter and the
+  // window becomes click-through until it returns. `forward` keeps mouse moves
+  // arriving, which is what lets the page notice the return.
+  ipcMain.on('window:mouse-through', (event, through) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return
+    setMouseThrough(Boolean(through))
+  })
   ipcMain.on('window:minimize', () => mainWindow?.minimize())
   ipcMain.on('window:close', () => mainWindow?.close())
   ipcMain.on('app:quit', () => app.quit())
@@ -706,6 +780,7 @@ if (!gotLock) {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.show()
+      setMouseThrough(false)
       mainWindow.webContents.send('view:changed', currentView)
     }
   })

@@ -63,7 +63,7 @@
         </header>
 
         <div class="strip-main" data-action="expand" role="button" tabindex="0" aria-label="展开账本">
-          <div class="strip-runway">
+          <div class="strip-runway" data-fit-wall>
             <span class="micro">RUNWAY / 预计可用</span>
             <div class="runway-line">
               <span class="runway-num serif" id="stripRunway">—</span>
@@ -72,7 +72,7 @@
             <span class="pace-caption" id="stripPaceCaption">按 30 天活跃日</span>
           </div>
 
-          <div class="strip-scale">
+          <div class="strip-scale" data-fit-wall>
             <div class="scale-head">
               <span class="micro">余额续航</span>
               <span class="scale-value mono" id="stripBalance">¥—</span>
@@ -88,7 +88,7 @@
             </div>
           </div>
 
-          <div class="strip-today">
+          <div class="strip-today" data-fit-wall>
             <span class="micro">TODAY / 今日</span>
             <span class="today-value mono" id="stripToday">¥—</span>
             <svg class="spark" id="stripSpark" viewBox="0 0 96 26" aria-hidden="true"></svg>
@@ -145,7 +145,7 @@
             <button class="text-btn" id="noticeAction" type="button">去设置</button>
           </div>
 
-          <section class="hero">
+          <section class="hero" data-fit-wall>
             <div class="gauge-block">
               <div class="section-eyebrow"><span class="micro">RUNWAY / 预计可用</span><span class="rule"></span></div>
               <div class="gauge" id="gauge">
@@ -201,7 +201,7 @@
             <div class="fuel-legend" id="fuelLegend"></div>
           </section>
 
-          <section class="chart-section">
+          <section class="chart-section" data-fit-wall>
             <div class="section-head">
               <div class="section-title"><span class="micro">LEDGER / 每日花费</span><span class="section-note">近 30 天</span></div>
               <div class="section-stat"><span class="serif" id="chartTotal">¥—</span><span class="micro">TOTAL</span></div>
@@ -222,7 +222,7 @@
             </div>
           </section>
 
-          <section class="mix-section">
+          <section class="mix-section" data-fit-wall>
             <div class="section-head">
               <div class="section-title"><span class="micro">MIX / 模型构成</span><span class="section-note" id="mixNote">近 30 天</span></div>
               <div class="section-stat"><span class="serif" id="mixEffective">—</span><span class="micro">EFFECTIVE / M TOKENS</span></div>

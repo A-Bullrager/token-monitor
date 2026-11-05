@@ -110,7 +110,7 @@ try {
   await capture('live-strip.png')
 
   await evaluate("document.querySelector('.strip-main').click()")
-  await waitFor("document.body.classList.contains('view-deck') && window.innerWidth === 576")
+  await waitFor("document.body.classList.contains('view-deck') && window.innerWidth === 514")
   await sleep(700)
   out.deck = await evaluate(`(() => {
     const panel = document.getElementById('panel')
@@ -165,7 +165,12 @@ try {
   await evaluate("document.querySelector('#themeSeg [data-theme=\"dark\"]').click()")
   await evaluate("document.getElementById('saveBtn').click()")
   await waitFor("!document.getElementById('settingsSheet').classList.contains('open') && document.body.classList.contains('theme-dark')")
-  await sleep(600)
+  // Saving the settings raises a toast after the async refresh, and it lives
+  // for 2.4s; the image is the card, not the receipt. Let the refresh land,
+  // then wait for the toast to be gone from the DOM.
+  await sleep(1200)
+  await waitFor("document.getElementById('toast').hidden", 9000)
+  await sleep(200)
   out.dark = await evaluate(`(() => {
     const panel = document.getElementById('panel')
     return {

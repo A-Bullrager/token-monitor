@@ -312,10 +312,16 @@ function applyTheme(mode) {
 function setRunwayType(node, value, base, compact = false) {
   if (!node) return
   const text = String(value ?? '')
+  // "999+" is the cap marker, not a measurement, and it is four characters —
+  // the length ladder treated it like "19.8" and left it at the base size. At
+  // the base size the number plus its DAYS unit ran 7px past the runway's own
+  // sheet on every language at the eight-figure fixture. The cap gets one step
+  // down so the unit stays on the surface with it.
+  const capped = text.endsWith('+')
   if (compact) {
-    node.style.fontSize = text.length > 5 ? '29px' : text.length > 4 ? '35px' : ''
+    node.style.fontSize = capped ? '35px' : text.length > 5 ? '29px' : text.length > 4 ? '35px' : ''
   } else {
-    node.style.fontSize = text.length > 5 ? '44px' : text.length > 4 ? '50px' : ''
+    node.style.fontSize = capped ? '44px' : text.length > 5 ? '44px' : text.length > 4 ? '50px' : ''
   }
 }
 
@@ -1441,7 +1447,7 @@ async function switchView(next, { persist = true } = {}) {
   panelEl.style.height = pin
   panelEl.style.minHeight = pin
   // The moving edge, now in the page. `--morph-show` is the band of stage that
-  // stays visible: the card plus the gutter around it (36px of padding on either
+  // stays visible: the card plus the gutter around it (the stage's padding on either
   // side, where the shadow lives). It is expressed against 100% rather than as a
   // hidden amount so that it means the same thing whatever the stage currently
   // is: while the window is still the small one the clip hides nothing and the
@@ -2086,6 +2092,35 @@ function bindEvents() {
 
   el.systemQuery?.addEventListener?.('change', () => {
     if (state.themeMode === 'system') applyTheme('system')
+  })
+
+  // The window is a rectangle around a rounded card; the stage gutter is
+  // transparent but still part of the window's hit area at the OS level, so a
+  // click there lands on nothing instead of reaching whatever is behind it.
+  // Report when the pointer is outside the panel and let main make the window
+  // click-through; forwarded moves bring the report back when it returns.
+  let mouseThrough = null
+  const reportPointer = (event) => {
+    const panel = el.panel
+    if (!panel) return
+    const box = panel.getBoundingClientRect()
+    const inside = event.clientX >= box.left && event.clientX <= box.right &&
+      event.clientY >= box.top && event.clientY <= box.bottom
+    if (mouseThrough === !inside) return
+    mouseThrough = !inside
+    document.documentElement.dataset.mouseThrough = mouseThrough ? '1' : '0'
+    bridge.mouseThrough?.(mouseThrough)
+  }
+  // pointermove is the modern event; the forwarded messages a click-through
+  // window receives are documented as mouse move messages, so listen for both
+  // and let the state check deduplicate them.
+  window.addEventListener('pointermove', reportPointer, { passive: true })
+  window.addEventListener('mousemove', reportPointer, { passive: true })
+  window.addEventListener('pointerleave', () => {
+    if (mouseThrough === true) return
+    mouseThrough = true
+    document.documentElement.dataset.mouseThrough = '1'
+    bridge.mouseThrough?.(true)
   })
 }
 

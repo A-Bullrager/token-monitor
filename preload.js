@@ -16,6 +16,12 @@ contextBridge.exposeInMainWorld('tm', {
   settleView: () => ipcRenderer.invoke('window:morph-settle'),
   setPinned: (pinned) => ipcRenderer.invoke('window:pin', pinned),
   applyTheme: (theme) => ipcRenderer.invoke('theme:apply', theme),
+  // The window is a rectangle around a rounded card, and its 36px stage gutter
+  // is transparent. Transparent pixels still hit-test at the OS level, so the
+  // gutter would swallow clicks meant for whatever is behind it. The renderer
+  // says when the pointer is outside the card; main turns the whole window into
+  // a click-through surface while it is.
+  mouseThrough: (through) => ipcRenderer.send('window:mouse-through', Boolean(through)),
   minimize: () => ipcRenderer.send('window:minimize'),
   close: () => ipcRenderer.send('window:close'),
   quit: () => ipcRenderer.send('app:quit'),

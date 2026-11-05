@@ -52,7 +52,10 @@
   --vermilion-soft: rgba(255, 59, 48, 0.12);
   --panel-edge: rgba(0, 0, 0, 0.06);
   --panel-highlight: rgba(255, 255, 255, 0.9);
-  --shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05), 0 6px 14px rgba(0, 0, 0, 0.09);
+  /* Tight enough to fit inside the 5px stage gutter: the old 14-20px blur was
+     what needed the 36px envelope, and a clipped blur would draw a hard edge at
+     the window. The rim, bloom and glass carry the depth now. */
+  --shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 1px 4px rgba(0, 0, 0, 0.08);
   /* Glass, and it has to be glass: the window is transparent and the desktop
      really is behind this card, so the card is a tint over it rather than a
      painted sheet. A milky gradient with full opacity — the previous pass —
@@ -98,7 +101,7 @@ body.theme-dark {
   --vermilion-soft: rgba(255, 69, 58, 0.2);
   --panel-edge: rgba(255, 255, 255, 0.08);
   --panel-highlight: rgba(255, 255, 255, 0.08);
-  --shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 2px 6px rgba(0, 0, 0, 0.35), 0 8px 16px rgba(0, 0, 0, 0.3);
+  --shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 1px 4px rgba(0, 0, 0, 0.5);
   /* The same glass, smoked. The sheet is a light film over the tint rather than
      a second colour, so the two levels stay visible over a dark wallpaper. */
   --glass-base: rgba(20, 20, 22, 0.88);
@@ -210,7 +213,11 @@ select,
 .stage {
   position: fixed;
   inset: 0;
-  padding: 36px;
+  /* The card's shadow envelope. It was 36px, which made the transparent window
+     a large invisible input area; 5px fits the shadow below and keeps the
+     window's rectangle close to the card. The card's screen position is held by
+     CARD_INSET in main.js, so shrinking this does not move the card. */
+  padding: 5px;
   display: flex;
 }
 
@@ -531,15 +538,20 @@ body.theme-dark .grain {
   min-height: 0;
   display: flex;
   align-items: center;
-  gap: 13px;
+  gap: 14px;
   padding: 5px 10px 3px 16px;
   cursor: pointer;
 }
 
 .strip-runway {
-  width: 108px;
+  width: 124px;
   flex: none;
   min-width: 0;
+  /* The sheet is the reader's box now, and its corners are rounded: text laid
+     out flush to a 12px curve reads as escaping the box even when nothing is
+     clipped. Six pixels of inner air clears the curve (6,6 is 8.5px from the
+     corner centre, inside a 12px radius) and keeps every label on the fill. */
+  padding: 6px 8px;
 }
 
 .runway-line {
@@ -576,7 +588,7 @@ body.theme-dark .grain {
 .strip-scale {
   flex: 1;
   min-width: 0;
-  padding-top: 1px;
+  padding: 6px 8px;
 }
 
 .scale-head,
@@ -685,7 +697,7 @@ body.theme-dark .grain {
 }
 
 .strip-today {
-  width: 90px;
+  width: 104px;
   flex: none;
   align-self: stretch;
   display: flex;
