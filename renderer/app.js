@@ -106,7 +106,7 @@ const state = {
   switching: false,
   loading: true,
   error: '',
-  version: '2.7.1',
+  version: '2.7.2',
   clearArmed: false,
   clearTimer: null,
   refreshTimer: null,
