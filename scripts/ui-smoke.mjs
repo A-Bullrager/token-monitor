@@ -801,9 +801,15 @@ try {
   })`)
   assert.equal(report.firstLaunch.collapsed.runway, '19.8')
 
+  // The deck's height is capped by the runner's work area — a 768px screen
+  // yields 668, not the design's 818 — so the wait asks for the form by its own
+  // bootstrap height instead of a number measured on this machine.
+  const deckSettledHeight = Math.max(200, (boot.formHeights?.deck ?? 818) - 40)
+  const deckSettled = `${viewExpr('view-deck')} && !${viewExpr('morphing')} && window.innerHeight >= ${deckSettledHeight}`
+
   await evaluate("document.querySelector('.strip-main').click()")
   try {
-    await waitFor('expanded again', `${viewExpr('view-deck')} && window.innerHeight > 700`, 25000, VIEW_DIAGNOSE)
+    await waitFor('expanded again', deckSettled, 25000, VIEW_DIAGNOSE)
   } catch (error) {
     // A bounded, recorded second click — the same shape as the morph attempts. On a
     // contended runner the window can still be moving while the renderer has
@@ -812,8 +818,7 @@ try {
     // here is never silence about a runner that struggled.
     report.firstLaunch.expandRetry = { first: String(error).slice(0, 700) }
     await evaluate("document.querySelector('.strip-main').click()")
-    await waitFor('expanded again after one recorded retry',
-      `${viewExpr('view-deck')} && window.innerHeight > 700`, 25000, VIEW_DIAGNOSE)
+    await waitFor('expanded again after one recorded retry', deckSettled, 25000, VIEW_DIAGNOSE)
     report.firstLaunch.expandRetry.recovered = true
   }
   await waitConfig((config) => config.view === 'deck', 'view deck')
