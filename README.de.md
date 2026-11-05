@@ -60,7 +60,7 @@ Die beiden Bilder unten kommen aus einem echten Fenster statt aus der gestellten
 ## Herunterladen und ausführen
 
 Veröffentlichungen: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Entwicklungsbauten liegen in den Artifacts jedes Actions-Laufs.
-**[v2.7.2](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.2) ist die aktuelle Veröffentlichung** — die dem Fenster die Karte zurückgab. Der transparente Saum ist 5px statt 36, also misst das Fenster in beiden Formen 514 in der Breite, während die Karte ihre 504px, ihre Größe (504×140 / 504×808) und ihre Bildschirmposition behält; der Morph ist eine vertikale Enthüllung, weil beide Formen eine Breite teilen, und das Neu-Layout des letzten Frames, das sie zittern ließ, ist weg. Die Lagen der zweiten Ebene sind Passungs-Wände mit Innenluft, sodass die Labels des Streifens in ihren gerundeten Flächen bleiben und eine große Heute-Zahl schrumpft statt über die Lage zu laufen; der transparente Saum meldet sich und das Fenster wird klickdurchlässig, sodass Klicks außerhalb der Karte das erreichen, was dahinter liegt. Alle vier nativen Runner waren grün, und die Seite trägt sechs Pakete plus `SHA256SUMS.txt`. Das Windows-Paket wurde von dieser Seite neu heruntergeladen, passte zur Prüfsumme und zum Asset-Digest von GitHub selbst, und wurde auf einem echten Windows-10-Rechner entpackt und gestartet, wo es Version 2.7.2 mit `isPackaged` meldete; die Pakete für Linux und macOS decken nur ihre eigenen Runner ab, nicht den Rechner des Entwicklers. Es ersetzt v2.7.1, das den Morph in die Seite holte und das getönte Glas festlegte — eine veröffentlichte Version wird nie umgeschrieben.
+**[v2.7.3](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.3) ist die aktuelle Veröffentlichung** — die die Schatten innerhalb von sechs Pixeln hält. Der transparente Saum ist auf 6px begrenzt (Fenster 516×152 / 516×820), während die Karte bei 504×140 / 504×808 und ihrem 48px-Abstand bleibt; der Schatten sind vier Lagen, die alle vor der Fensterkante ausklingen, und der dunkle Modus trägt eine viel leichtere Stapelung (0,2/0,1/0,24 Schwarz), damit er auf einem hellen Hintergrund als Kontakthauch liest und auf einem dunklen verschwindet. Das Fenster fragt beim Erscheinen den echten Cursor, sodass der erste Klick auf der Seite landet, auf der der Zeiger steht; der Saum bleibt klickdurchlässig. Alle vier nativen Runner waren grün, und die Seite trägt sechs Pakete plus `SHA256SUMS.txt`. Das Windows-Paket wurde von dieser Seite neu heruntergeladen, passte zur Prüfsumme und zum Asset-Digest von GitHub selbst, und wurde auf einem echten Windows-10-Rechner entpackt und gestartet, wo es Version 2.7.3 mit `isPackaged` meldete; die Pakete für Linux und macOS decken nur ihre eigenen Runner ab, nicht den Rechner des Entwicklers. Es ersetzt v2.7.2, das dem Fenster die Karte mit einem 5px-Saum zurückgab — eine veröffentlichte Version wird nie umgeschrieben.
 
 | Plattform | Paket | So startest du es |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ Die Oberfläche ist auf Chinesisch geschrieben, und jede andere Sprache ist ein 
 
 **Lokal (Windows 10 x64)**: Datentests, 22 Gruppen von Storage-Backend-Assertions mit simulierten Backends, Wörterbuch-Parität, Glyph-Bedarf, Oberfläche aus dem Quellcode, Verzeichnisbau und ein echtes ZIP-Entpacken und Starten sind grün; 16 Sprach-Szenarien × 4 Oberflächenzustände sind grün, jedes gesammelte Zeichen liegt im Korpus, und in keiner mitgelieferten Sprache wird ein Label abgeschnitten; in den 10 Zahlen-Passungen × 10 Größenordnungen läuft ebenfalls keine Zahl aus ihrer Box. fontTools wurde gegen die echten Subset-cmaps eingesetzt — jedes lateinische Zeichen, das die Wörterbücher auf den Schirm bringen können, sitzt im Inter-Subset, und jedes chinesische Zeichen im Bedarfsatz sitzt in einem der beiden Pakete.
 
-**Siebenundsechzig Cloud-Runden bisher; die v2.7.2-Veröffentlichung ist auf allen vier nativen Runnern grün.** Die Erzählung Runde für Runde ist unten eingeklappt — alles, was sie *negativ* belegt hat, steht außerhalb der Klappung, damit Einklappen keine Einschränkung verstecken kann. Eine dieser negativen Aussagen betrifft die Tests selbst: die Morph-Prüfung war auf macOS blind, weil dort die Fensterkante erst nach dem Verschwinden der CSS-Klasse wandert, die sie bemaß (Runde 12) — sie bewertet jetzt die tatsächlich beobachtete Bewegung.
+**Siebzig Cloud-Runden bisher; die v2.7.3-Veröffentlichung ist auf allen vier nativen Runnern grün.** Die Erzählung Runde für Runde ist unten eingeklappt — alles, was sie *negativ* belegt hat, steht außerhalb der Klappung, damit Einklappen keine Einschränkung verstecken kann. Eine dieser negativen Aussagen betrifft die Tests selbst: die Morph-Prüfung war auf macOS blind, weil dort die Fensterkante erst nach dem Verschwinden der CSS-Klasse wandert, die sie bemaß (Runde 12) — sie bewertet jetzt die tatsächlich beobachtete Bewegung.
 
 <details>
 <summary>Cloud-Baugeschichte (Runden 1–13)</summary>
@@ -298,6 +298,12 @@ Die Oberfläche ist auf Chinesisch geschrieben, und jede andere Sprache ist ein 
 
 **Runde 67 (`v2.7.2` Tag, run 41955097476)**: der Tag-Lauf baute und testete alle vier nativen Pakete, und der Release-Job prüfte sechs Dateinamen und ihre Digests gegen die von den Runnern gebauten Dateien und veröffentlichte sechs Pakete plus `SHA256SUMS.txt` im ersten Anlauf. Das Windows-ZIP wurde neu heruntergeladen, passte zur veröffentlichten Prüfsummenliste und zum Asset-Digest von GitHub selbst, und wurde hier entpackt und gestartet, wo es 2.7.2 mit `isPackaged` meldet; Linux und macOS decken nur ihre eigenen Runner ab.
 
+**Runde 68 (`89a42bf`, alle vier grün)**: nur Dokumentation — der v2.7.2-Record und die Runden 63–67.
+
+**Runde 69 (`853644b`, alle vier grün)**: Version 2.7.3. Der Saum wanderte von 5px auf die 6px-Obergrenze, der Schatten wurde vier Lagen, die darin enden, die Stapelung des dunklen Modus fiel auf 0,2/0,1/0,24 Schwarz, und die Cursor-Synchronisierung beim Anzeigen entscheidet die Klickdurchlässigkeit aus dem echten Zeiger. Alle vier Runner waren einig: 516px breit in beiden Formen, Streuung 0, Karte gepinnt.
+
+**Runde 70 (`v2.7.3` Tag, run 41973082480)**: der Tag-Lauf baute und testete alle vier nativen Pakete und veröffentlichte sechs Pakete plus `SHA256SUMS.txt` im ersten Anlauf; der Release-Job prüfte Asset-Menge und Digests. Das Windows-ZIP wurde neu heruntergeladen, passte zur veröffentlichten Prüfsummenliste und zum GitHub-Digest, und wurde hier gestartet, wo es 2.7.3 mit `isPackaged` meldet; Linux und macOS decken nur ihre eigenen Runner ab.
+
 </details>
 
 **Durch v2.7.0 geschlossen**: die Aufstellungsszeile des Guthabens wechselt ab zehntausend in die kompakte Schreibweise statt ab einer Million, sodass eine Maschine knapperer Metriken die letzten acht Pixel der deutschen Zeile zwischen ¥10.000 und ¥999.999,99 nicht mehr außerhalb der Kante landet. Die veröffentlichte v2.6.2 behält die alte Grenze — und das ist richtig so: eine veröffentlichte Version wird nie umgeschrieben.
@@ -340,7 +346,7 @@ Diese Prüfungen beweisen **nicht** die vollständige cmap-Abdeckung, jeden Ausw
 
 ## GitHub Actions und Veröffentlichungen
 
-Der Workflow ist [`.github/workflows/build.yml`](.github/workflows/build.yml); alle vier Runner haben echte Läufe abgeschlossen, und der Release-Pfad hat achtmal veröffentlicht — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2, v2.7.0, v2.7.1 und v2.7.2. Ein wöchentlicher Lauf gegen main fängt die Drift der Runner-Images ab, wenn gerade keine Veröffentlichung wartet; der Electron- und electron-builder-Download ist je Plattform und Lockfile gecacht; und nach dem Veröffentlichen prüft der Release-Job die Asset-Menge, ihre Digests und `SHA256SUMS.txt` gegen die von den Runners gebauten Dateien nach — eine Prüfung, die erst bei v2.7.0 lief, dort am eigenen Feldnamen scheiterte und seitdem am echten Release verifiziert ist.
+Der Workflow ist [`.github/workflows/build.yml`](.github/workflows/build.yml); alle vier Runner haben echte Läufe abgeschlossen, und der Release-Pfad hat neunmal veröffentlicht — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2, v2.7.0, v2.7.1, v2.7.2 und v2.7.3. Ein wöchentlicher Lauf gegen main fängt die Drift der Runner-Images ab, wenn gerade keine Veröffentlichung wartet; der Electron- und electron-builder-Download ist je Plattform und Lockfile gecacht; und nach dem Veröffentlichen prüft der Release-Job die Asset-Menge, ihre Digests und `SHA256SUMS.txt` gegen die von den Runners gebauten Dateien nach — eine Prüfung, die erst bei v2.7.0 lief, dort am eigenen Feldnamen scheiterte und seitdem am echten Release verifiziert ist.
 Ein lokales `git commit` löst in der Cloud nichts aus; ein Push, ein Pull Request oder ein manueller Lauf tun das. GitHub Packages ist für npm / Container-Registries und dergleichen — dieses Projekt verteilt Desktop-Binaries über Artifacts und Release-Assets.
 
 | Auslöser | Verhalten |
@@ -375,7 +381,7 @@ Ein Tag mit `-` (zum Beispiel `v2.7.0-beta.1`) wird als Pre-Release veröffentli
 
 ```bash
 git push origin main          # zuerst: alle vier Runner auf dem neuen Commit grün werden lassen
-git push origin v2.7.2        # danach: den Tag allein pushen, das ist der Release-Auslöser
+git push origin v2.7.3        # danach: den Tag allein pushen, das ist der Release-Auslöser
 ```
 
 GitHub-Dokumentation: [gehostete Runner](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [Events, die Workflows auslösen](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

@@ -60,7 +60,7 @@ The two images below come from a live window rather than the staged showcase, as
 ## Download and run
 
 Releases: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Development builds are in the Artifacts of each Actions run.
-**[v2.7.2](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.2) is the current release** — the one that gave the window back to the card. The transparent envelope is 5px instead of 36, so the window is 514 wide in both forms while the card keeps its 504px width, its size (504×140 / 504×808) and its screen position; the morph is a vertical reveal because both forms share one width, and the end-of-morph reflow that made it jitter is gone. The second-level sheets are fit walls with inner air, so the strip's labels stay inside their rounded surfaces and a large today figure shrinks instead of spilling past; the transparent gutter reports itself and the window becomes click-through, so clicks outside the card reach what is behind it. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and GitHub's own asset digest, and was extracted and launched on a real Windows 10 machine reporting version 2.7.2 with `isPackaged`; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop. It supersedes v2.7.1, which moved the morph into the page and set the tinted glass; a released version is never rewritten.
+**[v2.7.3](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.3) is the current release** — the one that keeps the shadow inside six pixels. The transparent envelope is capped at 6px (window 516×152 / 516×820) while the card stays 504×140 / 504×808 at its 48px inset; the shadow is four layers that all decay before the window edge, and dark mode wears a much lighter stack (0.2/0.1/0.24 black) so it reads as a contact hint on a light wallpaper and disappears on a dark one. The window asks the real cursor when it appears, so the first click goes to whichever side the pointer is on; the gutter remains click-through. All four native runners passed, and the page carries six packages plus `SHA256SUMS.txt`. The Windows package was re-downloaded from that page, matched its checksum and GitHub's own asset digest, and was extracted and launched on a real Windows 10 machine reporting version 2.7.3 with `isPackaged`; the Linux and macOS packages are covered by their own runners only, not by the developer's own desktop. It supersedes v2.7.2, which gave the window back to the card at a 5px envelope; a released version is never rewritten.
 
 | Platform | Package | How to run it |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 16 language scenarios × 4 interface states pass, every collected character is inside the corpus, no label is clipped in any shipped language, and 10 number-fit runs × 10 magnitudes leave no number outside its box.
 
-**Sixty-seven cloud rounds so far; the v2.7.2 release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat. One of those negatives is about the tests themselves: the morph check was blind on macOS, where the window edge moves after the CSS class it sampled had already gone (round 12), so it now grades the observed motion instead.
+**Seventy cloud rounds so far; the v2.7.3 release is green on all four native runners.** The round-by-round narrative is collapsed below — everything it proved *negative* is stated outside the collapse, so folding it cannot hide a caveat. One of those negatives is about the tests themselves: the morph check was blind on macOS, where the window edge moves after the CSS class it sampled had already gone (round 12), so it now grades the observed motion instead.
 
 <details>
 <summary>Cloud build history (rounds 1–13)</summary>
@@ -298,6 +298,12 @@ The interface is authored in Chinese, and every other language is a dictionary k
 
 **Round 67 (`v2.7.2` tag, run 41955097476)**: the tag run built and tested all four native packages, and the release job verified the six filenames and their digests against the files the runners built and published six packages plus `SHA256SUMS.txt` on its first attempt. The Windows ZIP was re-downloaded, matched both the published checksum list and GitHub's own asset digest, and was extracted and launched here reporting 2.7.2 with `isPackaged`; Linux and macOS are covered by their own runners only.
 
+**Round 68 (`89a42bf`, all four green)**: documentation only — the v2.7.2 record and rounds 63–67.
+
+**Round 69 (`853644b`, all four green)**: version 2.7.3. The envelope moved from 5px to the 6px ceiling, the shadow became four layers that end inside it, dark mode's stack dropped to 0.2/0.1/0.24 black, and the show-time pointer sync decides click-through from the real cursor. The four runners agreed: 516px wide in both forms, 0 spread, card pinned.
+
+**Round 70 (`v2.7.3` tag, run 41973082480)**: the tag run built and tested all four native packages and published six packages plus `SHA256SUMS.txt` on its first attempt; the release job verified the asset set and digests. The Windows ZIP was re-downloaded, matched the published checksum list and GitHub's digest, and launched here reporting 2.7.3 with `isPackaged`; Linux and macOS are covered by their own runners only.
+
 </details>
 
 **Closed by v2.7.0**: the ledger's balance breakdown switches to compact units from ten thousand up rather than from a million, so a German line with one of those two fields between ¥10,000 and ¥999,999.99 no longer loses its last eight pixels on a machine whose metrics are tight. The published v2.6.2 still draws it at a million, and will: a released version is never rewritten.
@@ -340,7 +346,7 @@ These checks do **not** prove complete cmap coverage, every fallback glyph, nati
 
 ## GitHub Actions and releases
 
-The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published eight times — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2, v2.7.0, v2.7.1 and v2.7.2. A weekly scheduled run against `main` catches runner-image drift while no release is waiting on the answer; the Electron and electron-builder downloads are cached per platform and lockfile, because a cold runner was re-fetching ~100MB before it ran anything; and after publishing, the release job re-checks the asset set, the published digests and `SHA256SUMS.txt` against the files the runners built — a step that first ran on v2.7.0, failed there on its own field name, and has since been checked against the live release.
+The workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml); all four runners have completed real runs, and the release path has published nine times — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2, v2.7.0, v2.7.1, v2.7.2 and v2.7.3. A weekly scheduled run against `main` catches runner-image drift while no release is waiting on the answer; the Electron and electron-builder downloads are cached per platform and lockfile, because a cold runner was re-fetching ~100MB before it ran anything; and after publishing, the release job re-checks the asset set, the published digests and `SHA256SUMS.txt` against the files the runners built — a step that first ran on v2.7.0, failed there on its own field name, and has since been checked against the live release.
 A local `git commit` triggers nothing in the cloud; a push, a pull request or a manual run does. GitHub Packages is for npm / container registries and the like — this project distributes desktop binaries through Artifacts and Release assets.
 
 | Trigger | Behaviour |
@@ -375,7 +381,7 @@ A tag containing `-` (for example `v2.7.0-beta.1`) is published as a pre-release
 
 ```bash
 git push origin main          # first: let all four runners go green on the new commit
-git push origin v2.7.2        # then: push the tag alone, which is what triggers a Release
+git push origin v2.7.3        # then: push the tag alone, which is what triggers a Release
 ```
 
 GitHub documentation: [hosted runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

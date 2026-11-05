@@ -60,7 +60,7 @@ As duas imagens abaixo vêm de uma janela real em execução, não da vitrine en
 ## Baixar e executar
 
 Lançamentos: [GitHub Releases](https://github.com/A-Bullrager/token-monitor/releases). Compilações de desenvolvimento estão nos Artifacts de cada execução do Actions.
-**[v2.7.2](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.2) é a versão atual** — a que devolveu a janela ao cartão. O envelope transparente é de 5px em vez de 36, então a janela mede 514 de largura nas duas formas enquanto o cartão mantém seus 504px, seu tamanho (504×140 / 504×808) e sua posição na tela; a deformação é uma revelação vertical porque as duas formas compartilham uma largura, e o rearranjo do último quadro que a fazia tremer não existe mais. As lâminas de segundo nível são paredes de ajuste com ar interno, então os rótulos da faixa ficam dentro das superfícies arredondadas e uma cifra de hoje grande encolhe em vez de transbordar; a faixa transparente se declara e a janela fica atravessável, de modo que cliques fora do cartão chegam ao que está atrás. Os quatro runners nativos passaram, e a página traz seis pacotes mais `SHA256SUMS.txt`. O pacote do Windows foi baixado de novo daquela página, bateu com a soma de verificação e com o resumo do próprio recurso do GitHub, e foi extraído e iniciado em um Windows 10 de verdade reportando versão 2.7.2 com `isPackaged`; os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners, não pela máquina do desenvolvedor. Ele substitui o v2.7.1, que levou a deformação para a página e fixou o vidro tingido — uma versão publicada nunca é reescrita.
+**[v2.7.3](https://github.com/A-Bullrager/token-monitor/releases/tag/v2.7.3) é a versão atual** — a que mantém a sombra dentro de seis pixels. O envelope transparente é limitado a 6px (janela 516×152 / 516×820) enquanto o cartão segue em 504×140 / 504×808 com seu recuo de 48px; a sombra são quatro camadas que decaem antes da borda da janela, e o modo escuro usa uma pilha bem mais leve (0,2/0,1/0,24 preto) para ler como um toque de contato sobre um papel de parede claro e sumir sobre um escuro. A janela pergunta pelo cursor real ao aparecer, então o primeiro clique vai para o lado em que o ponteiro está; a faixa continua atravessável. Os quatro runners nativos passaram, e a página traz seis pacotes mais `SHA256SUMS.txt`. O pacote do Windows foi baixado de novo daquela página, bateu com a soma de verificação e com o resumo do próprio recurso do GitHub, e foi extraído e iniciado em um Windows 10 de verdade reportando versão 2.7.3 com `isPackaged`; os pacotes de Linux e macOS são cobertos apenas pelos seus próprios runners, não pela máquina do desenvolvedor. Ele substitui o v2.7.2, que devolveu a janela ao cartão com um envelope de 5px — uma versão publicada nunca é reescrita.
 
 | Plataforma | Pacote | Como executar |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ A interface é escrita em chinês, e cada outro idioma é um dicionário cujas c
 
 nenhum rótulo fica cortado em nenhum idioma incluído; nas 10 passadas de caimento de número × 10 escalas de magnitude também nenhum número sai da caixa.
 
-**Sessenta e sete rodadas na nuvem até aqui; a versão v2.7.2 está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva. Um daqueles negativos é sobre os próprios testes: a checagem da deformação estava cega no macOS, onde a borda da janela se move depois que a classe CSS que ela amostrava já tinha sumido (rodada 12), então agora ela avalia o movimento observado.
+**Setenta rodadas na nuvem até aqui; a versão v2.7.3 está verde nos quatro runners nativos.** A narrativa rodada a rodada está dobrada abaixo — tudo o que ela provou *negativo* está dito fora da dobra, para que dobrar não possa esconder uma ressalva. Um daqueles negativos é sobre os próprios testes: a checagem da deformação estava cega no macOS, onde a borda da janela se move depois que a classe CSS que ela amostrava já tinha sumido (rodada 12), então agora ela avalia o movimento observado.
 
 <details>
 <summary>Histórico de compilações na nuvem (rodadas 1–13)</summary>
@@ -298,6 +298,12 @@ nenhum rótulo fica cortado em nenhum idioma incluído; nas 10 passadas de caime
 
 **Rodada 67 (`v2.7.2` tag, run 41955097476)**: a execução da tag construiu e testou os quatro pacotes nativos, e o job de lançamento verificou seis nomes e seus digests contra os arquivos que os runners construíram e publicou seis pacotes mais `SHA256SUMS.txt` de primeira. O ZIP do Windows foi baixado de novo, bateu com a lista de somas publicada e com o resumo do próprio recurso do GitHub, e foi extraído e iniciado aqui reportando 2.7.2 com `isPackaged`; Linux e macOS são cobertos apenas pelos seus próprios runners.
 
+**Rodada 68 (`89a42bf`, os quatro verdes)**: só documentação — o registro do v2.7.2 e as rodadas 63–67.
+
+**Rodada 69 (`853644b`, os quatro verdes)**: versão 2.7.3. O envelope passou de 5px para o teto de 6px, a sombra virou quatro camadas que terminam dentro, a pilha do modo escuro caiu para 0,2/0,1/0,24 preto, e a sincronização do ponteiro ao mostrar decide a passagem de cliques pelo cursor real. Os quatro runners concordaram: 516px de largura nas duas formas, dispersão 0, cartão alfinetado.
+
+**Rodada 70 (`v2.7.3` tag, run 41973082480)**: a execução da tag construiu e testou os quatro pacotes nativos e publicou seis pacotes mais `SHA256SUMS.txt` de primeira; o job de lançamento verificou o conjunto de recursos e os digests. O ZIP do Windows foi baixado de novo, bateu com a lista de somas publicada e com o resumo do GitHub, e foi iniciado aqui reportando 2.7.3 com `isPackaged`; Linux e macOS são cobertos apenas pelos seus próprios runners.
+
 </details>
 
 **Fechado pelo v2.7.0**: a linha de composição do saldo passa à notação compacta a partir de dez mil e não de um milhão, de modo que uma máquina com métricas justas já não deixa os últimos oito pixels da linha alemã fora da borda quando um daqueles dois campos cai entre ¥10.000 e ¥999.999,99. A v2.6.2 publicada mantém o limite velho, e vai manter: uma versão publicada nunca é reescrita.
@@ -340,7 +346,7 @@ Essas checagens **não** provam cobertura cmap completa, cada glifo de reserva, 
 
 ## GitHub Actions e lançamentos
 
-O fluxo é [`.github/workflows/build.yml`](.github/workflows/build.yml); os quatro runners completaram execuções de verdade, e o caminho de lançamento publicou oito vezes — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2, v2.7.0, v2.7.1 e v2.7.2. Uma execução semanal contra a main pega a deriva das imagens do runner quando nenhuma publicação está na fila; o download do Electron e do electron-builder fica em cache por plataforma e lockfile; e depois de publicar, o job de lançamento confere de novo o conjunto de recursos, seus resumos e o `SHA256SUMS.txt` contra os arquivos que os runners construíram — uma checagem que rodou pela primeira vez no v2.7.0, ali falhou pelo próprio nome de campo e desde então foi conferida no lançamento real.
+O fluxo é [`.github/workflows/build.yml`](.github/workflows/build.yml); os quatro runners completaram execuções de verdade, e o caminho de lançamento publicou nove vezes — v2.4.1, v2.5.0, v2.6.0, v2.6.1, v2.6.2, v2.7.0, v2.7.1, v2.7.2 e v2.7.3. Uma execução semanal contra a main pega a deriva das imagens do runner quando nenhuma publicação está na fila; o download do Electron e do electron-builder fica em cache por plataforma e lockfile; e depois de publicar, o job de lançamento confere de novo o conjunto de recursos, seus resumos e o `SHA256SUMS.txt` contra os arquivos que os runners construíram — uma checagem que rodou pela primeira vez no v2.7.0, ali falhou pelo próprio nome de campo e desde então foi conferida no lançamento real.
 Um `git commit` local não dispara nada na nuvem; um push, um pull request ou uma execução manual disparam. GitHub Packages é para npm / registros de contêiner e afins — este projeto distribui binários de desktop por Artifacts e assets de Release.
 
 | Gatilho | Comportamento |
@@ -375,7 +381,7 @@ Uma tag com `-` (por exemplo `v2.7.0-beta.1`) é publicada como pré-lançamento
 
 ```bash
 git push origin main          # primeiro: deixe os quatro runners ficarem verdes no commit novo
-git push origin v2.7.2        # depois: envie a tag sozinha, que é o que dispara uma Release
+git push origin v2.7.3        # depois: envie a tag sozinha, que é o que dispara uma Release
 ```
 
 Documentação do GitHub: [runners hospedados](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) · [Artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts) · [eventos que disparam fluxos de trabalho](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
