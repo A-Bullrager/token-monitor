@@ -614,6 +614,12 @@ try {
       // the usual suspect: Chromium throttles a hidden page's animation frames.
       frameGaps: run.samples.slice(1).map((s) => s.gap),
       worstFrameGap: run.samples.length > 1 ? Math.max(...run.samples.slice(1).map((s) => s.gap)) : 0,
+      // Which evidence can answer the "did it arrive in steps" question. A
+      // frame gap at or above the animation's own duration cannot contain a
+      // step: two samples are all any correct animation could produce. Then the
+      // engine's clock has to prove the animation ran instead of the edge
+      // series proving its shape.
+      gradeMode: (run.samples.length > 1 ? Math.max(...run.samples.slice(1).map((s) => s.gap)) : 0) < boot.morphMs * 0.75 ? 'steps' : 'clock',
       visibility: [...new Set(run.samples.map((s) => s.vis))],
       focused: run.samples.every((s) => s.has === true),
       // Where in the main process's trace this morph started, so the resize
@@ -678,7 +684,7 @@ try {
     panelFrom: grade.panelFrom, panelTo: grade.panelTo, panelDelta: grade.panelDelta,
     winIntermediate: grade.winIntermediate, sampledUntil: grade.sampledUntil,
     widthFrom: grade.widthFrom, widthTo: grade.widthTo, widthSpread: grade.widthSpread,
-    panelWidthSpread: grade.panelWidthSpread
+    panelWidthSpread: grade.panelWidthSpread, gradeMode: grade.gradeMode
   }))
   // The window's side, read from the main process's own trace (TM_MORPH_DEBUG=1,
   // which CI sets for this matrix). Kept because the two witnesses answer
@@ -711,11 +717,20 @@ try {
     `the page's edge did not travel the card's own ${graded.panelDelta}px: revealed ${graded.revealFrom} -> ${graded.revealTo} ` +
     `(after ${attempts.length} attempt(s): ${JSON.stringify(report.firstLaunch.morphAttempts)})`
   )
+  // A runner whose frame gap is as long as the animation cannot show its
+  // steps; on those the engine's own clock is the witness that the animation
+  // ran (a transition-less jump has no finished animation to clock). On a
+  // runner that can produce frames, the edge series still has to show them.
+  const stepsObservable = graded.gradeMode === 'steps'
+  const clockProvesAnimation = graded.animStates.includes('finished') &&
+    graded.animTimes.some((t) => t >= boot.morphMs * 0.75)
   assert.ok(
-    graded.revealSteps >= 3,
-    `the reveal must arrive in steps, not one jump (${graded.revealSteps} distinct edge positions over ${graded.fadingFrames} morphing frames, ` +
-    `worst frame gap ${graded.worstFrameGap}ms, visibility ${JSON.stringify(graded.visibility)}, focused ${graded.focused}, window saw ${graded.winIntermediate} intermediate sizes; ` +
-    `animation clock ${JSON.stringify(graded.animTimes)} state ${JSON.stringify(graded.animStates)}; env ${JSON.stringify(report.firstLaunch.motionEnv)}) — ${JSON.stringify(graded.revealSeries)}`
+    stepsObservable ? graded.revealSteps >= 3 : clockProvesAnimation,
+    `the reveal must arrive in steps when the frame cadence can resolve them ` +
+    `(${graded.gradeMode}: ${graded.revealSteps} distinct edge positions over ${graded.fadingFrames} morphing frames, ` +
+    `worst frame gap ${graded.worstFrameGap}ms against a ${boot.morphMs}ms animation, visibility ${JSON.stringify(graded.visibility)}, focused ${graded.focused}, ` +
+    `window saw ${graded.winIntermediate} intermediate sizes; animation clock ${JSON.stringify(graded.animTimes)} state ${JSON.stringify(graded.animStates)}; ` +
+    `env ${JSON.stringify(report.firstLaunch.motionEnv)}) — ${JSON.stringify(graded.revealSeries)}`
   )
   assert.ok(
     !morphResizes.traceEnabled || morphResizes.count <= 2 * attempts.length,
